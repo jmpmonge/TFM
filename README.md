@@ -87,5 +87,5 @@ python3 controllers/pioneer_TFM/datos_comparados.py
 
 ## Notas
 
-- El archivo `controllers/pioneer_TFM/READ.MD` contiene documentacion antigua y no refleja del todo la estructura actual.
 - El repositorio esta orientado a experimentacion academica y presentacion de resultados de TFM.
+
