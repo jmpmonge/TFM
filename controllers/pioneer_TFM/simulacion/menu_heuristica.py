@@ -1,5 +1,5 @@
-import config
-from robot_io import TIEMPO_PASO, supervisor
+from configuracion import config
+from simulacion.robot_io import TIEMPO_PASO, supervisor
 
 # ==============================
 # MAPEO TECLAS

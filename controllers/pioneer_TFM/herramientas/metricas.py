@@ -6,9 +6,9 @@ import time
 # (algoritmo.py, config.py, heuristicas.py) están en el directorio padre.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from algoritmos import astar, dijkstra, greedy
-from config import CELDA_INICIO, CELDA_OBJETIVO
-from heuristicas import h_manhattan, h_euclidiana, h_nula
+from planificacion.algoritmos import astar, dijkstra, greedy
+from configuracion.config import CELDA_INICIO, CELDA_OBJETIVO
+from planificacion.heuristicas import h_manhattan, h_euclidiana, h_nula
 
 
 heuristicas = {

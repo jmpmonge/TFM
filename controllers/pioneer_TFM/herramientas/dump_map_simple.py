@@ -30,8 +30,8 @@ from matplotlib.patches import Circle
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from algoritmos import planificar_mision
-from config import (
+from planificacion.algoritmos import planificar_mision
+from configuracion.config import (
     BATERIA_MAX,
     CELL_SIZE,
     CELDA_INICIO,
@@ -45,7 +45,7 @@ from config import (
     ORIGEN_MAPA_Y,
     RADIO_OBSTACULO,
 )
-from mapa import centro_celda
+from planificacion.mapa import centro_celda
 
 
 def construir_matriz():

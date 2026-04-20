@@ -1,4 +1,4 @@
-from config import (
+from configuracion.config import (
     CELL_SIZE,
     CENTRO_CELDA,
     GRID,

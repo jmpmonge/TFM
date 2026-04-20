@@ -1,9 +1,9 @@
-import menu_heuristica
-import config
-from algoritmos import planificar_mision
-from mapa import celda_a_mundo
-from robot_io import colocar_inicio, dibujar_bateria, fijar_velocidad_ruedas, leer_estado, paso
-from seguimiento import decidir
+from simulacion import menu_heuristica  # noqa: F401  (al importarse dispara el menú)
+from configuracion import config
+from planificacion.algoritmos import planificar_mision
+from planificacion.mapa import celda_a_mundo
+from simulacion.robot_io import colocar_inicio, dibujar_bateria, fijar_velocidad_ruedas, leer_estado, paso
+from simulacion.seguimiento import decidir
 
 CAMINO_CELDAS = []
 PUNTOS = []

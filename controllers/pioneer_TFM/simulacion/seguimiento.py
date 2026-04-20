@@ -1,6 +1,6 @@
 import math
 
-from config import VELOCIDAD_AVANCE, VELOCIDAD_GIRO
+from configuracion.config import VELOCIDAD_AVANCE, VELOCIDAD_GIRO
 
 
 def seguir_camino(estado, puntos, indice_objetivo):

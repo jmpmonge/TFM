@@ -1,8 +1,8 @@
 from heapq import heappop, heappush
 
-import config
-from heuristicas import resolver_heuristica, h_nula, h_manhattan
-from mapa import celda_a_mundo, es_libre
+from configuracion import config
+from planificacion.heuristicas import resolver_heuristica, h_nula, h_manhattan
+from planificacion.mapa import celda_a_mundo, es_libre
 
 
 MOVIMIENTOS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
@@ -26,7 +26,6 @@ ALGORITMOS_DISPONIBLES = {
     "astar": astar,
     "greedy": greedy,
 }
-
 
 # ==============================
 # NÚCLEO DE BÚSQUEDA

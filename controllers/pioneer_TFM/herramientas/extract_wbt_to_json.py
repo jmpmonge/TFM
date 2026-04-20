@@ -6,7 +6,7 @@ _CONTROLADOR_DIR = os.path.dirname(_AQUI)
 _ROOT_DIR = os.path.dirname(os.path.dirname(_CONTROLADOR_DIR))
 
 WBT_PATH = os.path.join(_ROOT_DIR, "worlds", "pioneer3at.wbt")
-JSON_PATH = os.path.join(_CONTROLADOR_DIR, "generated_map.json")
+JSON_PATH = os.path.join(_CONTROLADOR_DIR, "configuracion", "generated_map.json")
 
 OBSTACLE_RADIUS = 0.4 # Radio de los obstáculos en metros
 

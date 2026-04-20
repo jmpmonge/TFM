@@ -1,10 +1,15 @@
 import csv
 import os
+import sys
 import time
 
-from algoritmos import astar, dijkstra, greedy, ordenar_objetivos
-from config import BATERIA_MAX, CELDA_INICIO, CELDAS_OBJETIVO
-from heuristicas import HEURISTICAS_DISPONIBLES, h_manhattan
+# Permite ejecutar este script directamente (`python experimentos/datos_comparados.py`)
+# añadiendo la raíz del controlador al sys.path.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from planificacion.algoritmos import astar, dijkstra, greedy, ordenar_objetivos
+from configuracion.config import BATERIA_MAX, CELDA_INICIO, CELDAS_OBJETIVO
+from planificacion.heuristicas import HEURISTICAS_DISPONIBLES, h_manhattan
 
 
 def construir_mision(origen, objetivos, base, bateria):

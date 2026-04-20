@@ -21,10 +21,10 @@ from matplotlib.patches import Circle
 # El script vive en herramientas/, los módulos del controlador están en el dir padre.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import HEURISTICA, CELL_SIZE, MARGEN_SEGURIDAD, INICIO_MUNDO, OBJETIVO_MUNDO, X_LIMITS, Y_LIMITS, OBSTACULOS, RADIO_OBSTACULO, FILAS_MAPA, COLUMNAS_MAPA, CELDA_INICIO, CELDA_OBJETIVO
-from algoritmos import preparar_ruta_desde_config
-from mapa import celda_a_mundo
-from config import GRID
+from configuracion.config import HEURISTICA, CELL_SIZE, MARGEN_SEGURIDAD, INICIO_MUNDO, OBJETIVO_MUNDO, X_LIMITS, Y_LIMITS, OBSTACULOS, RADIO_OBSTACULO, FILAS_MAPA, COLUMNAS_MAPA, CELDA_INICIO, CELDA_OBJETIVO
+from planificacion.algoritmos import preparar_ruta_desde_config
+from planificacion.mapa import celda_a_mundo
+from configuracion.config import GRID
 
 def main():
     camino_celdas, _, _, _ = preparar_ruta_desde_config(HEURISTICA)
