@@ -2,7 +2,7 @@ import csv
 import os
 import time
 
-from algoritmos import astar, astar_multi, astar_weighted, ordenar_objetivos
+from algoritmos import astar, dijkstra, greedy, ordenar_objetivos
 from config import BATERIA_MAX, CELDA_INICIO, CELDAS_OBJETIVO
 from heuristicas import HEURISTICAS_DISPONIBLES, h_manhattan
 
@@ -164,10 +164,9 @@ if __name__ == "__main__":
     coste_optimo = max(0, len(ruta_optima) - 1)
 
     heuristicas = [
+        ("Nula", "nula"),
         ("Manhattan", "manhattan"),
         ("Euclidiana", "euclidiana"),
-        ("Energía", "energia"),
-        ("Ponderada", "ponderada"),
     ]
 
     pruebas = [
@@ -183,25 +182,28 @@ if __name__ == "__main__":
 
     pruebas += [
         (
-            "A*_Weighted",
+            "Greedy",
             nombre,
             lambda clave=clave: ejecutar_mision(
-                astar_weighted, HEURISTICAS_DISPONIBLES[clave], inicio, objetivos, base
+                greedy, HEURISTICAS_DISPONIBLES[clave], inicio, objetivos, base
             ),
         )
         for nombre, clave in heuristicas
     ]
 
-    pruebas += [
+    pruebas.append(
         (
-            "A*_Multi",
-            nombre,
-            lambda clave=clave: ejecutar_mision(
-                astar_multi, HEURISTICAS_DISPONIBLES[clave], inicio, objetivos, base
+            "Dijkstra",
+            "Nula",
+            lambda clave="nula": ejecutar_mision(
+                lambda origen, destino, heuristica: dijkstra(origen, destino),
+                HEURISTICAS_DISPONIBLES[clave],
+                inicio,
+                objetivos,
+                base,
             ),
         )
-        for nombre, clave in heuristicas
-    ]
+    )
 
     resultados = []
     for nombre_algoritmo, nombre_heuristica, funcion in pruebas:

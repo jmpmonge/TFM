@@ -1,138 +1,136 @@
-from config import ALGORITMO, HEURISTICA
-from heuristicas import HEURISTICAS_DISPONIBLES, h_nula
+from heapq import heappop, heappush
+
+import config
+from heuristicas import resolver_heuristica, h_nula, h_manhattan
 from mapa import celda_a_mundo, es_libre
-from config import CELDA_INICIO, CELDA_OBJETIVO
-from heapq import heappush, heappop
-from heuristicas import h_manhattan
 
 
-def resolver_heuristica(nombre=None):
-    return HEURISTICAS_DISPONIBLES[nombre or HEURISTICA]
+MOVIMIENTOS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
 
 # ==============================
-# FUNCIÓN BASE
+# ALGORITMOS
 # ==============================
 
-def a_estrella(inicio, objetivo, heuristica,
-               modo="normal", peso=1.5, alpha=0.7, beta=0.3):
+def dijkstra(inicio, objetivo, heuristica=None):
+    return _buscar_camino(inicio, objetivo, usar_coste=True, heuristica=h_nula)
 
-    abiertos = [(0, inicio)]
+def greedy(inicio, objetivo, heuristica):
+    return _buscar_camino(inicio, objetivo, usar_coste=False, heuristica=heuristica)
+
+def astar(inicio, objetivo, heuristica):
+    return _buscar_camino(inicio, objetivo, usar_coste=True, heuristica=heuristica)
+
+ALGORITMOS_DISPONIBLES = {
+    "dijkstra": dijkstra,
+    "astar": astar,
+    "greedy": greedy,
+}
+
+
+# ==============================
+# NÚCLEO DE BÚSQUEDA
+# ==============================
+
+def _buscar_camino(inicio, objetivo, usar_coste, heuristica):
+    abiertos = []
     viene_de = {inicio: None}
     coste = {inicio: 0}
     nodos_explorados = 0
 
+    h_inicial = heuristica(inicio, objetivo)
+
+    if usar_coste:
+        prioridad_inicial = 0 + h_inicial
+    else:
+        prioridad_inicial = h_inicial
+
+    heappush(abiertos, (prioridad_inicial, 0, inicio))
+
     while abiertos:
-        _, actual = heappop(abiertos)
+        _, coste_actual, actual = heappop(abiertos)
+
+        if coste_actual != coste.get(actual, float("inf")):
+            continue
+
         nodos_explorados += 1
 
         if actual == objetivo:
-            camino = []
-            while actual is not None:
-                camino.append(actual)
-                actual = viene_de[actual]
-            return camino[::-1], nodos_explorados
+            return _reconstruir_camino(viene_de, actual), nodos_explorados
 
-        for df, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
-            nf, nc = actual[0] + df, actual[1] + dc
-
-            if not es_libre(nf, nc):
-                continue
-
+        for vecino in _vecinos(actual):
             nuevo_coste = coste[actual] + 1
+            h = heuristica(vecino, objetivo)
 
-            if (nf, nc) not in coste or nuevo_coste < coste[(nf, nc)]:
-                coste[(nf, nc)] = nuevo_coste
-                viene_de[(nf, nc)] = actual
+            if usar_coste:
+                prioridad = nuevo_coste + h
+            else:
+                prioridad = h
 
-                # ==============================
-                # 🔥 AQUÍ ESTÁ TODO
-                # ==============================
-
-                h = heuristica((nf, nc), objetivo)
-
-                if modo == "normal":
-                    f = nuevo_coste + h
-
-                elif modo == "weighted":
-                    f = nuevo_coste + peso * h
-
-                elif modo == "multi":
-                    h_energy = nuevo_coste # simple
-                    f = nuevo_coste + alpha*h + beta*h_energy
-
-                elif modo == "greedy":
-                    f = h
-
-                else:
-                    f = nuevo_coste + h
-
-                heappush(abiertos, (f, (nf, nc)))
+            if vecino not in coste or nuevo_coste < coste[vecino]:
+                coste[vecino] = nuevo_coste
+                viene_de[vecino] = actual
+                heappush(abiertos, (prioridad, nuevo_coste, vecino))
 
     return [], nodos_explorados
 
 
+def _reconstruir_camino(viene_de, actual):
+    camino = []
+    while actual is not None:
+        camino.append(actual)
+        actual = viene_de[actual]
+    return camino[::-1]
+
+
+def _vecinos(celda):
+    fila, col = celda
+    for df, dc in MOVIMIENTOS:
+        nf, nc = fila + df, col + dc
+        if es_libre(nf, nc):
+            yield (nf, nc)
+
+
 # ==============================
-# EXTENSIONES
+# RESOLUCIÓN DESDE CONFIG
 # ==============================
 
-
-# Fórmula: f(n) = g(n)
-def dijkstra(inicio, objetivo):
-    return a_estrella(inicio, objetivo, h_nula, modo="normal")
-
-# Fórmula: f(n) = h(n)
-def greedy(inicio, objetivo, heuristica):
-    return a_estrella(inicio, objetivo, heuristica, modo="greedy")
-
-# Fórmula: f(n) = g(n) + h(n)
-def astar(inicio, objetivo, heuristica):
-    return a_estrella(inicio, objetivo, heuristica, modo="normal")
-
-# Fórmula: f(n) = g(n) + w * h(n)
-def astar_weighted(inicio, objetivo, heuristica, peso=1.5):
-    return a_estrella(inicio, objetivo, heuristica, modo="weighted", peso=peso)
-
-# Fórmula: f(n) = g(n) + alpha * h(n) + beta * h_energy(n)
-def astar_multi(inicio, objetivo, heuristica, alpha=0.7, beta=0.3):
-    return a_estrella(inicio, objetivo, heuristica, modo="multi", alpha=alpha, beta=beta)
+def resolver_algoritmo(nombre=None):
+    return ALGORITMOS_DISPONIBLES.get(nombre or config.ALGORITMO, astar)
 
 
 def preparar_ruta(inicio, objetivo, heuristica):
-    if ALGORITMO == "astar_weighted":
-        camino_celdas, nodos_explorados = astar_weighted(inicio, objetivo, heuristica)
-    elif ALGORITMO == "astar_multi":
-        camino_celdas, nodos_explorados = astar_multi(inicio, objetivo, heuristica)
-    else:
-        camino_celdas, nodos_explorados = astar(inicio, objetivo, heuristica)
+    funcion = resolver_algoritmo()
+    camino_celdas, nodos_explorados = funcion(inicio, objetivo, heuristica)
 
     puntos = [celda_a_mundo(celda) for celda in camino_celdas]
     indice_objetivo = 1 if len(puntos) > 1 else 0
+
     return camino_celdas, puntos, indice_objetivo, nodos_explorados
 
 
 def preparar_ruta_desde_config(nombre_heuristica=None):
     heuristica = resolver_heuristica(nombre_heuristica)
-    return preparar_ruta(CELDA_INICIO, CELDA_OBJETIVO, heuristica)
+    return preparar_ruta(config.CELDA_INICIO, config.CELDA_OBJETIVO, heuristica)
 
-def ordenar_objetivos(origen, objetivos): # ordena los objetivos por distancia a la fuente
-    lista = [] # lista de tuplas (distancia, objetivo)
 
-    for obj in objetivos: # para cada objetivo, calcula la distancia a la fuente             
-        distancia = abs(obj[0]-origen[0]) + abs(obj[1]-origen[1])
-        lista.append((distancia, obj)) # añade la distancia y el objetivo a la lista
+# ==============================
+# BATERÍA Y MISIÓN
+# ==============================
 
-    lista.sort() # ordena la lista por distancia
+def ordenar_objetivos(origen, objetivos):
+    return sorted(objetivos, key=lambda obj: h_manhattan(origen, obj))
 
-    return [elemento[1] for elemento in lista]
 
 def filtrar_objetivos_por_bateria(origen, objetivos, base, bateria):
     objetivos_ordenados = ordenar_objetivos(origen, objetivos)
+
     objetivos_validos = []
     coste_total = 0
-    pos = origen
+    posicion_actual = origen
 
     for obj in objetivos_ordenados:
-        coste_hasta_obj = h_manhattan(pos, obj)
+        coste_hasta_obj = h_manhattan(posicion_actual, obj)
         coste_vuelta_base = h_manhattan(obj, base)
 
         if coste_total + coste_hasta_obj + coste_vuelta_base > bateria:
@@ -140,25 +138,30 @@ def filtrar_objetivos_por_bateria(origen, objetivos, base, bateria):
 
         objetivos_validos.append(obj)
         coste_total += coste_hasta_obj
-        pos = obj
+        posicion_actual = obj
 
     return objetivos_validos
 
-def planificar_mision(origen, objetivos, base, bateria):
 
-    # 1. Filtrar objetivos
+def planificar_mision(origen, objetivos, base, bateria, devolver_nodos=False):
     objetivos_validos = filtrar_objetivos_por_bateria(origen, objetivos, base, bateria)
 
     rutas = []
-    pos = origen
+    nodos_totales = 0
+    posicion_actual = origen
+    heuristica = resolver_heuristica()
 
     for obj in objetivos_validos:
-        camino, _, _, nodos = preparar_ruta(pos, obj, resolver_heuristica())
+        camino, _, _, nodos = preparar_ruta(posicion_actual, obj, heuristica)
         rutas.append(camino)
-        pos = obj
+        nodos_totales += nodos
+        posicion_actual = obj
 
-    # vuelta a base
-    camino, _, _, nodos = preparar_ruta(pos, base, resolver_heuristica())
-    rutas.append(camino)
+    camino_vuelta, _, _, nodos = preparar_ruta(posicion_actual, base, heuristica)
+    rutas.append(camino_vuelta)
+    nodos_totales += nodos
+
+    if devolver_nodos:
+        return rutas, nodos_totales
 
     return rutas

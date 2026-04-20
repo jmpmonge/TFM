@@ -6,31 +6,52 @@ from robot_io import TIEMPO_PASO, supervisor
 # ==============================
 
 TECLAS_ALGORITMO = {
-    49: "astar",          # 1
-    50: "astar_weighted", # 2
-    51: "astar_multi",    # 3
+    49: "dijkstra",  # 1
+    50: "astar",     # 2
+    51: "greedy",    # 3
 }
 
-TECLAS_HEURISTICA = {
-    49: "manhattan",
-    50: "euclidiana",
-    51: "energia",
-    52: "ponderada",
+TECLAS_HEURISTICA_ASTAR = {
+    49: "nula",       # 1
+    50: "manhattan",  # 2
+    51: "euclidiana", # 3
 }
 
-ETIQUETAS_HEURISTICA = {
-    "manhattan": "Distancia Manhattan",
-    "euclidiana": "Distancia Euclidiana",
-    "energia": "Estimación de coste energético",
-    "ponderada": "Heurística ponderada",
+TECLAS_HEURISTICA_GREEDY = {
+    49: "manhattan",  # 1
+    50: "euclidiana", # 2
 }
+
+
+def etiqueta_modo_busqueda(algoritmo, heuristica=None):
+    clave_heuristica = heuristica or ""
+
+    if algoritmo == "dijkstra":
+        return "Dijkstra"
+
+    if algoritmo == "astar":
+        etiquetas = {
+            "nula": "A* con heurística nula (equivale a Dijkstra)",
+            "manhattan": "A* con heurística Manhattan",
+            "euclidiana": "A* con heurística Euclidiana",
+        }
+        return etiquetas.get(clave_heuristica, f"A* con heurística {heuristica}")
+
+    if algoritmo == "greedy":
+        etiquetas = {
+            "manhattan": "Greedy con heurística Manhattan",
+            "euclidiana": "Greedy con heurística Euclidiana",
+        }
+        return etiquetas.get(clave_heuristica, f"Greedy con heurística {heuristica}")
+
+    return str(algoritmo)
 
 
 def _esperar_liberacion_teclas(teclado):
-    """Espera hasta que no quede ninguna tecla pulsada/arrastrada."""
     while supervisor.step(TIEMPO_PASO) != -1:
         if teclado.getKey() == -1:
             return
+
 
 # ==============================
 # SELECCIÓN ALGORITMO
@@ -40,22 +61,24 @@ def elegir_algoritmo():
     teclado = supervisor.getKeyboard()
     teclado.enable(TIEMPO_PASO)
     _esperar_liberacion_teclas(teclado)
-    print("\n")
-    print("Pulsa dentro de la imagen y después \nselecciona el algoritmo")
+
+    print("\nSelecciona un algoritmo de búsqueda")
     print("=========================================")
     print("ELIGE ALGORITMO")
-    print("  1) A* clásico")
-    print("  2) Weighted A*")
-    print("  3) Multiheurística")
+    print("  1) Dijkstra")
+    print("  2) A*")
+    print("  3) Greedy")
     print("=========================================")
 
     while supervisor.step(TIEMPO_PASO) != -1:
         tecla = teclado.getKey()
+
         if tecla in TECLAS_ALGORITMO:
             elegido = TECLAS_ALGORITMO[tecla]
+
             while teclado.getKey() != -1:
                 pass
-            print("-> Algoritmo elegido:", elegido)
+
             _esperar_liberacion_teclas(teclado)
             return elegido
 
@@ -66,25 +89,44 @@ def elegir_algoritmo():
 # SELECCIÓN HEURÍSTICA
 # ==============================
 
-def elegir_heuristica():
+def elegir_heuristica(algoritmo):
+    # Dijkstra no necesita heurística
+    if algoritmo == "dijkstra":
+        return "nula"
+
     teclado = supervisor.getKeyboard()
     teclado.enable(TIEMPO_PASO)
     _esperar_liberacion_teclas(teclado)
-    print("=========================================")
-    print("ELIGE HEURISTICA")
-    print("  1) Distancia Manhattan")
-    print("  2) Distancia Euclidiana")
-    print("  3) Estimación de coste energético")
-    print("  4) Heurística ponderada: (f(n) = g(n) + w·h(n), w > 1)")
-    print("=========================================")
+
+    if algoritmo == "astar":
+        print("\nSelecciona una heurística para el algoritmo A*")
+        print("=========================================")
+        print("  1) Heurística nula (algoritmo Dijkstra)")
+        print("  2) Heurística Manhattan")
+        print("  3) Heurística Euclidiana")
+        print("=========================================")
+        teclas_heuristica = TECLAS_HEURISTICA_ASTAR
+
+    elif algoritmo == "greedy":
+        print("\nSelecciona una heurística para el algoritmo Greedy")
+        print("=========================================")
+        print("  1) Heurística Manhattan")
+        print("  2) Heurística Euclidiana")
+        print("=========================================")
+        teclas_heuristica = TECLAS_HEURISTICA_GREEDY
+
+    else:
+        return config.HEURISTICA
 
     while supervisor.step(TIEMPO_PASO) != -1:
         tecla = teclado.getKey()
-        if tecla in TECLAS_HEURISTICA:
-            elegida = TECLAS_HEURISTICA[tecla]
+
+        if tecla in teclas_heuristica:
+            elegida = teclas_heuristica[tecla]
+
             while teclado.getKey() != -1:
                 pass
-            print("-> Heuristica elegida:", ETIQUETAS_HEURISTICA[elegida])
+
             _esperar_liberacion_teclas(teclado)
             return elegida
 
@@ -97,16 +139,13 @@ def elegir_heuristica():
 
 def elegir_configuracion():
     algoritmo = elegir_algoritmo()
-    heuristica = elegir_heuristica()
+    heuristica = elegir_heuristica(algoritmo)
 
     config.ALGORITMO = algoritmo
     config.HEURISTICA = heuristica
 
-    print("=========================================")
-    print("CONFIGURACIÓN FINAL:")
-    print(" Algoritmo:", algoritmo)
-    print(" Heurística:", ETIQUETAS_HEURISTICA.get(heuristica, heuristica))
-    print("=========================================")
+    print("-> Modo elegido:", etiqueta_modo_busqueda(algoritmo, heuristica))
+    return algoritmo, heuristica
 
 
 elegir_configuracion()
