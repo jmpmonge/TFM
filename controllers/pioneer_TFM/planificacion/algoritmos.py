@@ -143,6 +143,23 @@ def filtrar_objetivos_por_bateria(origen, objetivos, base, bateria):
     return objetivos_validos
 
 
+def aplanar_mision(rutas):
+    """Une los tramos devueltos por `planificar_mision` en un único camino.
+
+    Si algún tramo está vacío (no se encontró ruta), devuelve [] para señalar
+    que la misión completa es inválida.
+    """
+    camino = []
+    for i, ruta in enumerate(rutas):
+        if not ruta:
+            return []
+        if i == 0:
+            camino.extend(ruta)
+        else:
+            camino.extend(ruta[1:])
+    return camino
+
+
 def planificar_mision(origen, objetivos, base, bateria, devolver_nodos=False,
                       algoritmo=None, heuristica=None):
     """Planifica la misión completa (visita objetivos válidos y vuelve a base).

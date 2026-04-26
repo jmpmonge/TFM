@@ -38,6 +38,7 @@ from planificacion.algoritmos import (
     astar,
     dijkstra,
     greedy,
+    aplanar_mision,
     filtrar_objetivos_por_bateria,
     planificar_mision,
 )
@@ -48,19 +49,6 @@ from planificacion.heuristicas import HEURISTICAS_DISPONIBLES
 # ============================================================================
 # UTILIDADES
 # ============================================================================
-
-def aplanar_rutas(rutas):
-    """Une los tramos de una misión en un único camino, sin duplicar uniones."""
-    camino = []
-    for i, ruta in enumerate(rutas):
-        if not ruta:
-            return []  # un tramo sin solución invalida la misión completa
-        if i == 0:
-            camino.extend(ruta)
-        else:
-            camino.extend(ruta[1:])
-    return camino
-
 
 def lanzar_mision(algoritmo, heuristica, inicio, base):
     """Wrapper para llamar a `planificar_mision` con un algoritmo/heurística fijos."""
@@ -84,7 +72,7 @@ def medir(nombre_algoritmo, nombre_heuristica, funcion, coste_optimo_referencia)
     rutas, nodos = funcion()
     t1 = time.perf_counter()
 
-    coste = max(0, len(aplanar_rutas(rutas)) - 1)
+    coste = max(0, len(aplanar_mision(rutas)) - 1)
     tiempo = t1 - t0
     eficiencia = (coste / nodos * 100.0) if nodos else 0.0
     expansion = (nodos / coste) if coste else 0.0
@@ -190,7 +178,7 @@ if __name__ == "__main__":
     objetivos = filtrar_objetivos_por_bateria(inicio, CELDAS_OBJETIVO, base, BATERIA_MAX)
 
     rutas_optimas, _ = lanzar_mision(astar, HEURISTICAS_DISPONIBLES["manhattan"], inicio, base)
-    coste_optimo = max(0, len(aplanar_rutas(rutas_optimas)) - 1)
+    coste_optimo = max(0, len(aplanar_mision(rutas_optimas)) - 1)
 
     heuristicas = [
         ("Nula", "nula"),

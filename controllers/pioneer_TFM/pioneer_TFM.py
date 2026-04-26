@@ -1,6 +1,6 @@
 from simulacion import menu_heuristica  # noqa: F401  (al importarse dispara el menú)
 from configuracion import config
-from planificacion.algoritmos import planificar_mision
+from planificacion.algoritmos import planificar_mision, aplanar_mision
 from planificacion.mapa import celda_a_mundo
 from simulacion.robot_io import colocar_inicio, dibujar_bateria, fijar_velocidad_ruedas, leer_estado, paso
 from simulacion.seguimiento import decidir
@@ -19,12 +19,7 @@ rutas, NODOS_EXPLORADOS = planificar_mision(
     devolver_nodos=True,
 )
 
-for i, ruta in enumerate(rutas):
-    if i == 0:
-        CAMINO_CELDAS.extend(ruta)
-    else:
-        CAMINO_CELDAS.extend(ruta[1:])
-
+CAMINO_CELDAS = aplanar_mision(rutas)
 PUNTOS = [celda_a_mundo(celda) for celda in CAMINO_CELDAS]
 INDICE_OBJETIVO = 1 if len(PUNTOS) > 1 else 0
 
