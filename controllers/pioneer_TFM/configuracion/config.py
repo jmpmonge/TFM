@@ -2,6 +2,7 @@ import json
 import math
 import os
 
+
 # Ruta del directorio donde vive este propio config.py. Usándola siempre como
 # base hacemos que los ficheros de datos (generated_map.json, etc.) se
 # encuentren independientemente del CWD desde el que se lance Python.
@@ -13,7 +14,7 @@ _AQUI = os.path.dirname(os.path.abspath(__file__))
 
 TIEMPO_PASO = 32 # 32ms (velocidad de lectura de cada paso)  
 VELOCIDAD_AVANCE = 6.4 # Velocidad de avance en m/s, máxima 6.4 m/s
-VELOCIDAD_GIRO = 2.0 # Velocidad de giro en rad/s, máxima 12.4 rad/s    
+VELOCIDAD_GIRO = 6.0 # Velocidad de giro en rad/s, máxima 6.4 rad/s    
 RADIO_RUEDA = 0.0975 # Radio de las ruedas en m
 DISTANCIA_EJES = 0.325 # Distancia entre las ruedas en m
 
@@ -57,7 +58,7 @@ with open(os.path.join(_AQUI, "generated_map.json"), "r", encoding="utf-8") as f
 X_LIMITS = mapa["x_limits"]          # por ejemplo [-30.0, 30.0]
 Y_LIMITS = mapa["y_limits"]          # por ejemplo [-30.0, 30.0]
 RADIO_OBSTACULO = mapa["obstacle_radius"] # Radio de los obstáculos en metros
-OBSTACULOS = mapa["obstacles"]        # lista de {"name": ..., "x": ..., "y": ...}
+OBSTACULOS = mapa["obstacles"]        # diccionario de {"name": ..., "x": ..., "y": ...}
 GOALS = mapa.get("goals", [])
 
 if GOALS:
@@ -76,23 +77,29 @@ ALTO_MAPA = Y_LIMITS[1] - Y_LIMITS[0] # Alto del mapa en metros
 COLUMNAS_MAPA = int(ANCHO_MAPA / CELL_SIZE) # Número de columnas del mapa
 FILAS_MAPA = int(ALTO_MAPA / CELL_SIZE) # Número de filas del mapa
 
+
 # ============================================================================
 # FUNCIONES AUXILIARES
+# Definidas aquí (y no en planificacion/mapa.py) para evitar import circular:
+# config.py las usa internamente al construir la rejilla y al calcular las
+# celdas de inicio/objetivo. mapa.py replica las mismas funciones para que el
+# resto del proyecto las consuma desde la capa de planificación.
 # ============================================================================
 
 def mundo_a_celda(x, y):
-    col = int((x - ORIGEN_MAPA_X) / CELL_SIZE) # Convierte la coordenada X del mundo a la columna del mapa
-    row = int((y - ORIGEN_MAPA_Y) / CELL_SIZE) # Convierte la coordenada Y del mundo a la fila del mapa
-
-    col = max(0, min(COLUMNAS_MAPA - 1, col)) # Asegura que la columna esté dentro del rango del mapa
-    row = max(0, min(FILAS_MAPA - 1, row)) # Asegura que la columna y la fila estén dentro del rango del mapa
-    return row, col # Devuelve la fila y la columna en el mapa
+    col = int((x - ORIGEN_MAPA_X) / CELL_SIZE)
+    row = int((y - ORIGEN_MAPA_Y) / CELL_SIZE)
+    col = max(0, min(COLUMNAS_MAPA - 1, col))
+    row = max(0, min(FILAS_MAPA - 1, row))
+    return row, col
 
 
 def centro_celda(row, col):
-    x = ORIGEN_MAPA_X + (col + 0.5) * CELL_SIZE # Convierte la columna del mapa a la coordenada X del mundo
-    y = ORIGEN_MAPA_Y + (row + 0.5) * CELL_SIZE # Convierte la fila del mapa a la coordenada Y del mundo
-    return x, y # Devuelve la coordenada X y Y del mundo
+    # CENTRO_CELDA = CELL_SIZE / 2 (mitad de una celda en metros).
+    # Sumar este offset al borde izquierdo de la celda nos sitúa en su centro.
+    x = ORIGEN_MAPA_X + col * CELL_SIZE + CENTRO_CELDA
+    y = ORIGEN_MAPA_Y + row * CELL_SIZE + CENTRO_CELDA
+    return x, y
 
 
 # ============================================================================

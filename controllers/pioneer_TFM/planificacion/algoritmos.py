@@ -98,8 +98,9 @@ def resolver_algoritmo(nombre=None):
     return ALGORITMOS_DISPONIBLES.get(nombre or config.ALGORITMO, astar)
 
 
-def preparar_ruta(inicio, objetivo, heuristica):
-    funcion = resolver_algoritmo()
+def preparar_ruta(inicio, objetivo, heuristica, algoritmo=None):
+    """Resuelve un tramo. Si `algoritmo` es None, se lee de config."""
+    funcion = algoritmo if algoritmo is not None else resolver_algoritmo()
     camino_celdas, nodos_explorados = funcion(inicio, objetivo, heuristica)
 
     puntos = [celda_a_mundo(celda) for celda in camino_celdas]
@@ -142,21 +143,28 @@ def filtrar_objetivos_por_bateria(origen, objetivos, base, bateria):
     return objetivos_validos
 
 
-def planificar_mision(origen, objetivos, base, bateria, devolver_nodos=False):
+def planificar_mision(origen, objetivos, base, bateria, devolver_nodos=False,
+                      algoritmo=None, heuristica=None):
+    """Planifica la misión completa (visita objetivos válidos y vuelve a base).
+
+    Por defecto usa el algoritmo y la heurística definidos en `config`. Para
+    comparativas (datos_comparados.py) se pueden inyectar manualmente vía
+    `algoritmo=` y `heuristica=`.
+    """
     objetivos_validos = filtrar_objetivos_por_bateria(origen, objetivos, base, bateria)
 
     rutas = []
     nodos_totales = 0
     posicion_actual = origen
-    heuristica = resolver_heuristica()
+    h = heuristica if heuristica is not None else resolver_heuristica()
 
     for obj in objetivos_validos:
-        camino, _, _, nodos = preparar_ruta(posicion_actual, obj, heuristica)
+        camino, _, _, nodos = preparar_ruta(posicion_actual, obj, h, algoritmo)
         rutas.append(camino)
         nodos_totales += nodos
         posicion_actual = obj
 
-    camino_vuelta, _, _, nodos = preparar_ruta(posicion_actual, base, heuristica)
+    camino_vuelta, _, _, nodos = preparar_ruta(posicion_actual, base, h, algoritmo)
     rutas.append(camino_vuelta)
     nodos_totales += nodos
 

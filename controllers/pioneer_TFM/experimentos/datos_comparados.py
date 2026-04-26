@@ -1,69 +1,93 @@
+"""
+=========================================================================
+ESTE ARCHIVO ES UN SCRIPT EJECUTABLE, NO UN MÓDULO.
+=========================================================================
+
+No lo importa nadie del controlador. Sirve para lanzar offline la misma
+planificación que ejecuta el robot en Webots, pero variando algoritmo y
+heurística para comparar métricas.
+
+Reutiliza directamente la lógica del controlador real:
+  - `filtrar_objetivos_por_bateria` y `planificar_mision` de
+    `planificacion.algoritmos` (las mismas funciones que se invocan desde
+    `pioneer_TFM.py`).
+  - `HEURISTICAS_DISPONIBLES` y `astar / greedy / dijkstra` también vienen
+    de los módulos del controlador.
+
+Uso:
+    python3 controllers/pioneer_TFM/experimentos/datos_comparados.py
+
+Salida:
+  - Tabla por consola con: longitud de ruta, coste, nodos expandidos,
+    tiempo, eficiencia, factor de expansión y desviación frente a
+    A*+Manhattan.
+  - Fichero `experimentos/resultados_experimentos.csv` con las mismas
+    métricas (formato apto para Excel y para la memoria del TFM).
+"""
+
 import csv
 import os
 import sys
 import time
 
-# Permite ejecutar este script directamente (`python experimentos/datos_comparados.py`)
-# añadiendo la raíz del controlador al sys.path.
+# Permite ejecutar este script directamente añadiendo la raíz del controlador
+# (la carpeta padre, donde están planificacion/, configuracion/, etc.) al sys.path.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from planificacion.algoritmos import astar, dijkstra, greedy, ordenar_objetivos
+from planificacion.algoritmos import (
+    astar,
+    dijkstra,
+    greedy,
+    filtrar_objetivos_por_bateria,
+    planificar_mision,
+)
 from configuracion.config import BATERIA_MAX, CELDA_INICIO, CELDAS_OBJETIVO
-from planificacion.heuristicas import HEURISTICAS_DISPONIBLES, h_manhattan
+from planificacion.heuristicas import HEURISTICAS_DISPONIBLES
 
 
-def construir_mision(origen, objetivos, base, bateria):
-    objetivos_ordenados = ordenar_objetivos(origen, objetivos)
-    objetivos_validos = []
-    coste_estimado = 0
-    pos = origen
+# ============================================================================
+# UTILIDADES
+# ============================================================================
 
-    for obj in objetivos_ordenados:
-        coste_hasta_obj = h_manhattan(pos, obj)
-        coste_vuelta_base = h_manhattan(obj, base)
-
-        if coste_estimado + coste_hasta_obj + coste_vuelta_base > bateria:
-            break
-
-        objetivos_validos.append(obj)
-        coste_estimado += coste_hasta_obj
-        pos = obj
-
-    return objetivos_validos
-
-
-def ejecutar_mision(funcion_tramo, heuristica, origen, objetivos, base):
-    ruta_total = []
-    nodos_totales = 0
-    pos = origen
-
-    for destino in [*objetivos, base]:
-        camino, nodos = funcion_tramo(pos, destino, heuristica)
-        nodos_totales += nodos
-
-        if not camino:
-            return [], nodos_totales
-
-        if ruta_total:
-            ruta_total.extend(camino[1:])
+def aplanar_rutas(rutas):
+    """Une los tramos de una misión en un único camino, sin duplicar uniones."""
+    camino = []
+    for i, ruta in enumerate(rutas):
+        if not ruta:
+            return []  # un tramo sin solución invalida la misión completa
+        if i == 0:
+            camino.extend(ruta)
         else:
-            ruta_total.extend(camino)
+            camino.extend(ruta[1:])
+    return camino
 
-        pos = destino
 
-    return ruta_total, nodos_totales
+def lanzar_mision(algoritmo, heuristica, inicio, base):
+    """Wrapper para llamar a `planificar_mision` con un algoritmo/heurística fijos."""
+    return planificar_mision(
+        inicio,
+        CELDAS_OBJETIVO,
+        base,
+        BATERIA_MAX,
+        devolver_nodos=True,
+        algoritmo=algoritmo,
+        heuristica=heuristica,
+    )
 
+
+# ============================================================================
+# MEDICIÓN
+# ============================================================================
 
 def medir(nombre_algoritmo, nombre_heuristica, funcion, coste_optimo_referencia):
     t0 = time.perf_counter()
-    camino, nodos = funcion()
+    rutas, nodos = funcion()
     t1 = time.perf_counter()
 
-    longitud = len(camino)
-    coste = max(0, longitud - 1)
+    coste = max(0, len(aplanar_rutas(rutas)) - 1)
     tiempo = t1 - t0
-    eficiencia = (longitud / nodos * 100.0) if nodos else 0.0
-    expansion = (nodos / longitud) if longitud else 0.0
+    eficiencia = (coste / nodos * 100.0) if nodos else 0.0
+    expansion = (nodos / coste) if coste else 0.0
     diferencia_coste = coste - coste_optimo_referencia
 
     if diferencia_coste == 0:
@@ -76,7 +100,6 @@ def medir(nombre_algoritmo, nombre_heuristica, funcion, coste_optimo_referencia)
     return {
         "algoritmo": nombre_algoritmo,
         "heuristica": nombre_heuristica,
-        "ruta": longitud,
         "coste": coste,
         "nodos": nodos,
         "tiempo": tiempo,
@@ -86,15 +109,18 @@ def medir(nombre_algoritmo, nombre_heuristica, funcion, coste_optimo_referencia)
     }
 
 
+# ============================================================================
+# SALIDA
+# ============================================================================
+
 def imprimir_tabla(resultados):
     columnas = [
         ("Algoritmo", "algoritmo"),
         ("Heurística", "heuristica"),
-        ("Longitud ruta (celdas)", "ruta"),
         ("Coste total (pasos)", "coste"),
         ("Nodos expandidos", "nodos"),
         ("Tiempo ejecución (s)", "tiempo"),
-        ("Eficiencia camino/nodos (%)", "eficiencia"),
+        ("Eficiencia coste/nodos (%)", "eficiencia"),
         ("Factor expansión", "expansion"),
         ("Diferencia frente a A*+Manhattan", "comparacion_referencia"),
     ]
@@ -135,12 +161,11 @@ def exportar_csv(resultados, ruta_csv):
     columnas = [
         ("algoritmo", "algoritmo"),
         ("heuristica", "heuristica"),
-        ("longitud_ruta_celdas", "ruta"),
         ("coste_total_pasos", "coste"),
         ("nodos_expandidos", "nodos"),
         ("tiempo_ejecucion_s", "tiempo"),
-        ("eficiencia_camino_sobre_nodos_pct", "eficiencia"),
-        ("factor_expansion_nodos_por_celda", "expansion"),
+        ("eficiencia_coste_sobre_nodos_pct", "eficiencia"),
+        ("factor_expansion_nodos_por_paso", "expansion"),
         ("diferencia_coste_frente_astar_manhattan", "comparacion_referencia"),
     ]
 
@@ -154,19 +179,18 @@ def exportar_csv(resultados, ruta_csv):
             })
 
 
+# ============================================================================
+# MAIN
+# ============================================================================
+
 if __name__ == "__main__":
     inicio = CELDA_INICIO
     base = CELDA_INICIO
-    objetivos = construir_mision(inicio, CELDAS_OBJETIVO, base, BATERIA_MAX)
 
-    ruta_optima, _ = ejecutar_mision(
-        astar,
-        HEURISTICAS_DISPONIBLES["manhattan"],
-        inicio,
-        objetivos,
-        base,
-    )
-    coste_optimo = max(0, len(ruta_optima) - 1)
+    objetivos = filtrar_objetivos_por_bateria(inicio, CELDAS_OBJETIVO, base, BATERIA_MAX)
+
+    rutas_optimas, _ = lanzar_mision(astar, HEURISTICAS_DISPONIBLES["manhattan"], inicio, base)
+    coste_optimo = max(0, len(aplanar_rutas(rutas_optimas)) - 1)
 
     heuristicas = [
         ("Nula", "nula"),
@@ -174,41 +198,27 @@ if __name__ == "__main__":
         ("Euclidiana", "euclidiana"),
     ]
 
-    pruebas = [
-        (
+    pruebas = []
+
+    for nombre, clave in heuristicas:
+        pruebas.append((
             "A*",
             nombre,
-            lambda clave=clave: ejecutar_mision(
-                astar, HEURISTICAS_DISPONIBLES[clave], inicio, objetivos, base
-            ),
-        )
-        for nombre, clave in heuristicas
-    ]
+            lambda clave=clave: lanzar_mision(astar, HEURISTICAS_DISPONIBLES[clave], inicio, base),
+        ))
 
-    pruebas += [
-        (
+    for nombre, clave in heuristicas:
+        pruebas.append((
             "Greedy",
             nombre,
-            lambda clave=clave: ejecutar_mision(
-                greedy, HEURISTICAS_DISPONIBLES[clave], inicio, objetivos, base
-            ),
-        )
-        for nombre, clave in heuristicas
-    ]
+            lambda clave=clave: lanzar_mision(greedy, HEURISTICAS_DISPONIBLES[clave], inicio, base),
+        ))
 
-    pruebas.append(
-        (
-            "Dijkstra",
-            "Nula",
-            lambda clave="nula": ejecutar_mision(
-                lambda origen, destino, heuristica: dijkstra(origen, destino),
-                HEURISTICAS_DISPONIBLES[clave],
-                inicio,
-                objetivos,
-                base,
-            ),
-        )
-    )
+    pruebas.append((
+        "Dijkstra",
+        "Nula",
+        lambda: lanzar_mision(dijkstra, HEURISTICAS_DISPONIBLES["nula"], inicio, base),
+    ))
 
     resultados = []
     for nombre_algoritmo, nombre_heuristica, funcion in pruebas:
