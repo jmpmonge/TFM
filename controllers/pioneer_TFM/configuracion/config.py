@@ -15,9 +15,8 @@ _AQUI = os.path.dirname(os.path.abspath(__file__))
 TIEMPO_PASO = 32 # 32ms (velocidad de lectura de cada paso)  
 VELOCIDAD_AVANCE = 6.4 # Velocidad de avance en m/s, máxima 6.4 m/s
 VELOCIDAD_GIRO = 6.0 # Velocidad de giro en rad/s, máxima 6.4 rad/s    
-RADIO_RUEDA = 0.0975 # Radio de las ruedas en m
+RUEDAS = 0.0975 # Radio de las ruedas en m
 DISTANCIA_EJES = 0.325 # Distancia entre las ruedas en m
-
 
 # Algoritmo de planificacion activo.
 ALGORITMO = "astar"
@@ -34,7 +33,6 @@ HEURISTICA = "manhattan"
 CELL_SIZE = 0.17
 CENTRO_CELDA = CELL_SIZE / 2
 
-
 # Margen extra para no rozar columnas en metros
 MARGEN_SEGURIDAD = 0.6 
 
@@ -47,7 +45,6 @@ OBJETIVOS_MUNDO_POR_DEFECTO = [
     (-25.0, -25.0),
 ] # Fallback por si el JSON aún no incluye los objetivos
 BATERIA_MAX = 800 # NÚMERO DE UNIDADES DE BATERÍA, 1 UNIDAD = PASO DE 32ms
-
 
 # ============================================================================
 # LEER JSON MINIMO
@@ -86,7 +83,7 @@ FILAS_MAPA = int(ALTO_MAPA / CELL_SIZE) # Número de filas del mapa
 # resto del proyecto las consuma desde la capa de planificación.
 # ============================================================================
 
-def mundo_a_celda(x, y):
+def mundo_a_rejilla(x, y):
     col = int((x - ORIGEN_MAPA_X) / CELL_SIZE)
     row = int((y - ORIGEN_MAPA_Y) / CELL_SIZE)
     col = max(0, min(COLUMNAS_MAPA - 1, col))
@@ -140,9 +137,9 @@ for row in range(FILAS_MAPA):
 # ============================================================================
 # COMPROBAR START Y GOAL
 # ============================================================================
-CELDA_INICIO = mundo_a_celda(INICIO_MUNDO[0], INICIO_MUNDO[1])
-CELDA_OBJETIVO = mundo_a_celda(OBJETIVO_MUNDO[0], OBJETIVO_MUNDO[1])
-CELDAS_OBJETIVO = [mundo_a_celda(x, y) for x, y in OBJETIVOS_MUNDO]
+CELDA_INICIO = mundo_a_rejilla(INICIO_MUNDO[0], INICIO_MUNDO[1])
+CELDA_OBJETIVO = mundo_a_rejilla(OBJETIVO_MUNDO[0], OBJETIVO_MUNDO[1])
+CELDAS_OBJETIVO = [mundo_a_rejilla(x, y) for x, y in OBJETIVOS_MUNDO]
 
 if not GRID[CELDA_INICIO[0]][CELDA_INICIO[1]]:
     raise ValueError(f"INICIO_MUNDO cae dentro de obstáculo: {INICIO_MUNDO} -> {CELDA_INICIO}")

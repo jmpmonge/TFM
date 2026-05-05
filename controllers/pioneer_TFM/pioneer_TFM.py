@@ -10,7 +10,7 @@ PUNTOS = []
 INDICE_OBJETIVO = 0
 NODOS_EXPLORADOS = 0
 
-objetivos_celda = [config.mundo_a_celda(x, y) for x, y in config.OBJETIVOS_MUNDO]
+objetivos_celda = [config.mundo_a_rejilla(x, y) for x, y in config.OBJETIVOS_MUNDO]
 rutas, NODOS_EXPLORADOS = planificar_mision(
     config.CELDA_INICIO,
     objetivos_celda,

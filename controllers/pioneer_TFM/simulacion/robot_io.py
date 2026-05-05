@@ -31,6 +31,22 @@ for rueda in ruedas_izquierdas + ruedas_derechas:
     rueda.setPosition(float("inf"))
     rueda.setVelocity(0.0)
 
+# Velocidad máxima declarada por el motor (Pioneer 3-AT: 6.4 rad/s).
+# Saturamos contra ella en `fijar_velocidad_ruedas` para evitar warnings
+# "exceeds maxVelocity" cuando avance y giro se combinan al máximo.
+# Restamos un epsilon pequeño porque Webots compara estrictamente.
+_VELOCIDAD_MAX_RUEDA = min(
+    rueda.getMaxVelocity() for rueda in ruedas_izquierdas + ruedas_derechas
+) - 1e-6
+
+
+def _saturar(velocidad):
+    if velocidad > _VELOCIDAD_MAX_RUEDA:
+        return _VELOCIDAD_MAX_RUEDA
+    if velocidad < -_VELOCIDAD_MAX_RUEDA:
+        return -_VELOCIDAD_MAX_RUEDA
+    return velocidad
+
 
 def colocar_inicio(x, y, z=0.0, orientacion=0.0):
     nodo = supervisor.getFromDef("PIONEER_3AT")
@@ -82,11 +98,14 @@ def dibujar_bateria(bateria_actual, bateria_max):
 
 
 def fijar_velocidad_ruedas(velocidad_izquierda, velocidad_derecha):
+    v_izq = _saturar(float(velocidad_izquierda))
+    v_der = _saturar(float(velocidad_derecha))
+
     for rueda in ruedas_izquierdas:
-        rueda.setVelocity(float(velocidad_izquierda))
+        rueda.setVelocity(v_izq)
 
     for rueda in ruedas_derechas:
-        rueda.setVelocity(float(velocidad_derecha))
+        rueda.setVelocity(v_der)
 
 
 def detener():
