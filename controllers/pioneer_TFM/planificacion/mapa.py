@@ -12,7 +12,7 @@ from configuracion.config import (
 # FUNCIONES AUXILIARES
 # ============================================================================
 
-def mundo_a_celda(x, y):
+def mundo_a_rejilla(x, y):
     col = int((x - ORIGEN_MAPA_X) / CELL_SIZE)
     row = int((y - ORIGEN_MAPA_Y) / CELL_SIZE)
 

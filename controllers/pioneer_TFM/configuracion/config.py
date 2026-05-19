@@ -1,12 +1,12 @@
 import json
 import math
 import os
-
+import pathlib
 
 # Ruta del directorio donde vive este propio config.py. Usándola siempre como
 # base hacemos que los ficheros de datos (generated_map.json, etc.) se
 # encuentren independientemente del CWD desde el que se lance Python.
-_AQUI = os.path.dirname(os.path.abspath(__file__))
+_AQUI = pathlib.Path(__file__).parent
 
 # ============================================================================
 # PARAMETROS GENERALES
@@ -33,8 +33,8 @@ HEURISTICA = "manhattan"
 CELL_SIZE = 0.17
 CENTRO_CELDA = CELL_SIZE / 2
 
-# Margen extra para no rozar columnas en metros
-MARGEN_SEGURIDAD = 0.6 
+OBSTACLE_RADIUS = 0.4 # Radio de los obstáculos en metros∫
+MARGEN_SEGURIDAD = 0.6 # Margen extra para no rozar columnas en metros
 
 # Punto inicial en coordenadas del mundo (plano X-Y)
 INICIO_MUNDO = (15.16, -2.61) # Coordenadas del punto inicial en metros
@@ -49,7 +49,7 @@ BATERIA_MAX = 800 # NÚMERO DE UNIDADES DE BATERÍA, 1 UNIDAD = PASO DE 32ms
 # ============================================================================
 # LEER JSON MINIMO
 # ============================================================================
-with open(os.path.join(_AQUI, "generated_map.json"), "r", encoding="utf-8") as f: # Abre el archivo JSON
+with open(pathlib.Path(_AQUI, "generated_map.json"), "r", encoding="utf-8") as f: # Abre el archivo JSON
     mapa = json.load(f) # Carga el mapa desde el archivo JSON
 
 X_LIMITS = mapa["x_limits"]          # por ejemplo [-30.0, 30.0]

@@ -35,13 +35,16 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from planificacion.algoritmos import (
+    astar_ponderado,
     astar,
     dijkstra,
     greedy,
     aplanar_mision,
+    coste_movimiento,
     filtrar_objetivos_por_bateria,
     planificar_mision,
 )
+
 from configuracion.config import BATERIA_MAX, CELDA_INICIO, CELDAS_OBJETIVO
 from planificacion.heuristicas import HEURISTICAS_DISPONIBLES
 
@@ -72,7 +75,7 @@ def medir(nombre_algoritmo, nombre_heuristica, funcion, coste_optimo_referencia)
     rutas, nodos = funcion()
     t1 = time.perf_counter()
 
-    coste = max(0, len(aplanar_mision(rutas)) - 1)
+    coste = calcular_coste_real_rutas(rutas)
     tiempo = t1 - t0
     eficiencia = (coste / nodos * 100.0) if nodos else 0.0
     expansion = (nodos / coste) if coste else 0.0
@@ -96,6 +99,29 @@ def medir(nombre_algoritmo, nombre_heuristica, funcion, coste_optimo_referencia)
         "comparacion_referencia": comparacion_referencia,
     }
 
+
+def calcular_coste_real_rutas(rutas):
+    """
+    Calcula el coste real acumulado de una misión completa.
+
+    Ya no mide solo la longitud de la ruta.
+    Ahora suma el coste real de cada transición entre celdas:
+
+        coste_total = Σ coste_movimiento(celda_actual, celda_siguiente)
+
+    Esto permite que el CSV refleje pendiente, tracción, energía
+    u otros factores ambientales que se añadan al coste g(n).
+    """
+
+    coste_total = 0.0
+
+    for ruta in rutas:
+        for i in range(len(ruta) - 1):
+            actual = ruta[i]
+            siguiente = ruta[i + 1]
+            coste_total += coste_movimiento(actual, siguiente)
+
+    return coste_total
 
 # ============================================================================
 # SALIDA
@@ -178,7 +204,7 @@ if __name__ == "__main__":
     objetivos = filtrar_objetivos_por_bateria(inicio, CELDAS_OBJETIVO, base, BATERIA_MAX)
 
     rutas_optimas, _ = lanzar_mision(astar, HEURISTICAS_DISPONIBLES["manhattan"], inicio, base)
-    coste_optimo = max(0, len(aplanar_mision(rutas_optimas)) - 1)
+    coste_optimo = calcular_coste_real_rutas(rutas_optimas)
 
     heuristicas = [
         ("Nula", "nula"),
@@ -188,24 +214,57 @@ if __name__ == "__main__":
 
     pruebas = []
 
+    # A* normal: f(n) = g(n) + h(n)
     for nombre, clave in heuristicas:
         pruebas.append((
             "A*",
             nombre,
-            lambda clave=clave: lanzar_mision(astar, HEURISTICAS_DISPONIBLES[clave], inicio, base),
+            lambda clave=clave: lanzar_mision(
+                astar,
+                HEURISTICAS_DISPONIBLES[clave],
+                inicio,
+                base
+            ),
         ))
 
+    # A* ponderado: f(n) = g(n) + w · h(n)
+    # No probamos heurística nula porque sería equivalente a Dijkstra.
+    for nombre, clave in heuristicas:
+        if clave != "nula":
+            pruebas.append((
+                "A* ponderado",
+                nombre,
+                lambda clave=clave: lanzar_mision(
+                    astar_ponderado,
+                    HEURISTICAS_DISPONIBLES[clave],
+                    inicio,
+                    base
+                ),
+            ))
+
+    # Greedy: f(n) = h(n)
     for nombre, clave in heuristicas:
         pruebas.append((
             "Greedy",
             nombre,
-            lambda clave=clave: lanzar_mision(greedy, HEURISTICAS_DISPONIBLES[clave], inicio, base),
+            lambda clave=clave: lanzar_mision(
+                greedy,
+                HEURISTICAS_DISPONIBLES[clave],
+                inicio,
+                base
+            ),
         ))
 
+    # Dijkstra: f(n) = g(n)
     pruebas.append((
         "Dijkstra",
         "Nula",
-        lambda: lanzar_mision(dijkstra, HEURISTICAS_DISPONIBLES["nula"], inicio, base),
+        lambda: lanzar_mision(
+            dijkstra,
+            HEURISTICAS_DISPONIBLES["nula"],
+            inicio,
+            base
+        ),
     ))
 
     resultados = []
