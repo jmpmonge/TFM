@@ -1,6 +1,11 @@
-from simulacion import menu_heuristica  # noqa: F401  (al importarse dispara el menú)
+from simulacion import menu_heuristica
 from configuracion import config
-from planificacion.algoritmos import planificar_mision, aplanar_mision
+
+# Menú antes de planificacion: si algo falla al importar algoritmos,
+# el usuario ya habrá podido elegir modo (y ver el error después).
+menu_heuristica.elegir_configuracion()
+
+from planificacion.algoritmos import planificar_mision, aplanar_mision, imprimir_resumen_planificacion
 from planificacion.mapa import celda_a_mundo
 from simulacion.robot_io import colocar_inicio, dibujar_bateria, fijar_velocidad_ruedas, leer_estado, paso
 from simulacion.seguimiento import decidir
@@ -25,15 +30,12 @@ INDICE_OBJETIVO = 1 if len(PUNTOS) > 1 else 0
 
 colocar_inicio(config.INICIO_MUNDO[0], config.INICIO_MUNDO[1], orientacion=0.0)
 
-print("=========================================")
-print("PRUEBA PIONEER ROUTE CONTROLLER")
-print("Algoritmo  :", config.ALGORITMO.upper())
-print("Heurística :", config.HEURISTICA.upper())
-print("Inicio     =", config.INICIO_MUNDO)
-print("Objetivos  =", config.OBJETIVOS_MUNDO)
-print("Ruta       :", len(CAMINO_CELDAS), "celdas")
-print("Nodos expl.:", NODOS_EXPLORADOS)
-print("=========================================")
+imprimir_resumen_planificacion(
+    config.CELDA_INICIO,
+    objetivos_celda,
+    CAMINO_CELDAS,
+    NODOS_EXPLORADOS,
+)
 
 bateria_actual = config.BATERIA_MAX
 dibujar_bateria(bateria_actual, config.BATERIA_MAX)

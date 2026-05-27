@@ -25,38 +25,72 @@ ALGORITMO = "astar"
 # Opciones: "manhattan" | "euclidiana" | "cero" (Dijkstra) | "agresiva" (greedy)
 HEURISTICA = "manhattan"
 
+# Parámetros de ARA* (ε = peso de la heurística en cada iteración)
+# ε alto  → ruta más rápida de calcular
+# ε = 1.0 → mismo criterio que A* normal
+EPSILON_INICIAL_ARA = 2.5
+EPSILON_FINAL_ARA = 1.0
+EPSILON_PASO_ARA = 0.5
+
+# Peso fijo del A* ponderado en comparativas: f(n) = g(n) + epsilon * h(n)
+PESO_ASTAR_PONDERADO = 1.5
+
 # ============================================================================
 # AJUSTES DEL MAPA
 # ============================================================================
 # Tamaño de cada celda en metros.
+
+# En terreno de 7x7 metros, cada celda es de 1 metro de lado.
+CELL_SIZE = 1
+
 # El robot es ~0.5 m y queremos que ocupe 3x3 celdas → 0.5 / 3 ≈ 0.17 m
-CELL_SIZE = 0.17
+# CELL_SIZE = 0.17
 CENTRO_CELDA = CELL_SIZE / 2
 
-OBSTACLE_RADIUS = 0.4 # Radio de los obstáculos en metros∫
-MARGEN_SEGURIDAD = 0.6 # Margen extra para no rozar columnas en metros
+# para mapa 7x7
+OBSTACLE_RADIUS = 0.0 # Radio de los obstáculos en metros∫
+MARGEN_SEGURIDAD = 0.0
+# para mapa amplio
+# OBSTACLE_RADIUS = 0.4 # Radio de los obstáculos en metros∫
+# MARGEN_SEGURIDAD = 0.6 # Margen extra para no rozar columnas en metros
 
-# Punto inicial en coordenadas del mundo (plano X-Y)
-INICIO_MUNDO = (15.16, -2.61) # Coordenadas del punto inicial en metros
+# Valores por defecto si el JSON no trae start/goals (mapa ARA* 7×7 clásico).
+INICIO_MUNDO_POR_DEFECTO = (3.0, -3.0)
 OBJETIVOS_MUNDO_POR_DEFECTO = [
-    (25.0, 25.0),
-    (-25.0, 25.0),
-    (25.0, -25.0),
-    (-25.0, -25.0),
-] # Fallback por si el JSON aún no incluye los objetivos
+    (-3.0, 3.0),
+]
 BATERIA_MAX = 800 # NÚMERO DE UNIDADES DE BATERÍA, 1 UNIDAD = PASO DE 32ms
 
 # ============================================================================
-# LEER JSON MINIMO
+# SINCRONIZAR Y LEER MAPA DESDE JSON
+# Si pioneer3at.wbt cambió, se regenera generated_map.json al importar config.
 # ============================================================================
-with open(pathlib.Path(_AQUI, "generated_map.json"), "r", encoding="utf-8") as f: # Abre el archivo JSON
-    mapa = json.load(f) # Carga el mapa desde el archivo JSON
+import sys
+
+_CONTROLLER_DIR = _AQUI.parent
+if str(_CONTROLLER_DIR) not in sys.path:
+    sys.path.insert(0, str(_CONTROLLER_DIR))
+
+from herramientas.extract_wbt_to_json import sincronizar_si_necesario
+
+_JSON_MAPA = _AQUI / "generated_map.json"
+if sincronizar_si_necesario(verbose=False):
+    print("[config] Mapa actualizado desde worlds/pioneer3at.wbt")
+
+with open(_JSON_MAPA, "r", encoding="utf-8") as f:
+    mapa = json.load(f)
 
 X_LIMITS = mapa["x_limits"]          # por ejemplo [-30.0, 30.0]
 Y_LIMITS = mapa["y_limits"]          # por ejemplo [-30.0, 30.0]
 RADIO_OBSTACULO = mapa["obstacle_radius"] # Radio de los obstáculos en metros
 OBSTACULOS = mapa["obstacles"]        # diccionario de {"name": ..., "x": ..., "y": ...}
 GOALS = mapa.get("goals", [])
+START = mapa.get("start")
+
+if START:
+    INICIO_MUNDO = (START["x"], START["y"])
+else:
+    INICIO_MUNDO = INICIO_MUNDO_POR_DEFECTO
 
 if GOALS:
     OBJETIVOS_MUNDO = [(goal["x"], goal["y"]) for goal in GOALS]
@@ -84,55 +118,67 @@ FILAS_MAPA = int(ALTO_MAPA / CELL_SIZE) # Número de filas del mapa
 # ============================================================================
 
 def mundo_a_rejilla(x, y):
+    """Misma convención que planificacion/mapa.py (fila 0 = parte superior)."""
     col = int((x - ORIGEN_MAPA_X) / CELL_SIZE)
-    row = int((y - ORIGEN_MAPA_Y) / CELL_SIZE)
+    row = int(((ORIGEN_MAPA_Y + FILAS_MAPA * CELL_SIZE) - y) / CELL_SIZE)
     col = max(0, min(COLUMNAS_MAPA - 1, col))
     row = max(0, min(FILAS_MAPA - 1, row))
     return row, col
 
 
 def centro_celda(row, col):
-    # CENTRO_CELDA = CELL_SIZE / 2 (mitad de una celda en metros).
-    # Sumar este offset al borde izquierdo de la celda nos sitúa en su centro.
     x = ORIGEN_MAPA_X + col * CELL_SIZE + CENTRO_CELDA
-    y = ORIGEN_MAPA_Y + row * CELL_SIZE + CENTRO_CELDA
+    y = ORIGEN_MAPA_Y + (FILAS_MAPA - 1 - row) * CELL_SIZE + CENTRO_CELDA
     return x, y
 
 
 # ============================================================================
 # CREAR REJILLA
-# True = celda libre, False = celda ocupada (obstáculo o pared)
+# 0 = celda libre, 1 = celda ocupada (muro del laberinto)
 # ============================================================================
-GRID = [[True for _ in range(COLUMNAS_MAPA)] for _ in range(FILAS_MAPA)]
+GRID = [[0 for _ in range(COLUMNAS_MAPA)] for _ in range(FILAS_MAPA)]
 
-# ============================================================================
-# MARCAR PAREDES EXTERIORES
-# ============================================================================
-for c in range(COLUMNAS_MAPA):
-    GRID[0][c] = False
-    GRID[FILAS_MAPA - 1][c] = False
-
-for r in range(FILAS_MAPA):
-    GRID[r][0] = False
-    GRID[r][COLUMNAS_MAPA - 1] = False
-
-# ============================================================================
-# MARCAR OBSTACULOS
-# ============================================================================
-radio_total = RADIO_OBSTACULO + MARGEN_SEGURIDAD
+# No se marca borde exterior: el mapa lógico es 7×7 y los muros vienen del JSON.
+# La arena Webots 8×8 es solo margen visual fuera de este grid.
 
 for row in range(FILAS_MAPA):
     for col in range(COLUMNAS_MAPA):
         x, y = centro_celda(row, col)
 
         for obs in OBSTACULOS:
-            dx = x - obs["x"]
-            dy = y - obs["y"]
-            dist = math.sqrt(dx * dx + dy * dy)
 
-            if dist <= radio_total:
-                GRID[row][col] = False
-                break
+            tipo = obs.get("type", "cylinder")
+
+            # ------------------------------------------------------------
+            # CASO 1: MURO RECTANGULAR / BOX
+            # ------------------------------------------------------------
+            if tipo == "box":
+                margen = MARGEN_SEGURIDAD
+
+                mitad_x = obs["size_x"] / 2.0
+                mitad_y = obs["size_y"] / 2.0
+
+                dentro_x = abs(x - obs["x"]) <= (mitad_x + margen)
+                dentro_y = abs(y - obs["y"]) <= (mitad_y + margen)
+
+                if dentro_x and dentro_y:
+                    GRID[row][col] = 1
+                    break
+
+            # ------------------------------------------------------------
+            # CASO 2: OBSTÁCULO CIRCULAR / CYLINDER
+            # ------------------------------------------------------------
+            else:
+                radio = obs.get("radius", RADIO_OBSTACULO)
+                radio_total = radio + MARGEN_SEGURIDAD
+
+                dx = x - obs["x"]
+                dy = y - obs["y"]
+                dist = math.sqrt(dx * dx + dy * dy)
+
+                if dist <= radio_total:
+                    GRID[row][col] = 1
+                    break
 
 # ============================================================================
 # COMPROBAR START Y GOAL
@@ -141,12 +187,12 @@ CELDA_INICIO = mundo_a_rejilla(INICIO_MUNDO[0], INICIO_MUNDO[1])
 CELDA_OBJETIVO = mundo_a_rejilla(OBJETIVO_MUNDO[0], OBJETIVO_MUNDO[1])
 CELDAS_OBJETIVO = [mundo_a_rejilla(x, y) for x, y in OBJETIVOS_MUNDO]
 
-if not GRID[CELDA_INICIO[0]][CELDA_INICIO[1]]:
+if GRID[CELDA_INICIO[0]][CELDA_INICIO[1]] != 0:
     raise ValueError(f"INICIO_MUNDO cae dentro de obstáculo: {INICIO_MUNDO} -> {CELDA_INICIO}")
 
-if not GRID[CELDA_OBJETIVO[0]][CELDA_OBJETIVO[1]]:
+if GRID[CELDA_OBJETIVO[0]][CELDA_OBJETIVO[1]] != 0:
     raise ValueError(f"OBJETIVO_MUNDO cae dentro de obstáculo: {OBJETIVO_MUNDO} -> {CELDA_OBJETIVO}")
 
 for objetivo_mundo, celda_objetivo in zip(OBJETIVOS_MUNDO, CELDAS_OBJETIVO):
-    if not GRID[celda_objetivo[0]][celda_objetivo[1]]:
+    if GRID[celda_objetivo[0]][celda_objetivo[1]] != 0:
         raise ValueError(f"Objetivo cae dentro de obstáculo: {objetivo_mundo} -> {celda_objetivo}")

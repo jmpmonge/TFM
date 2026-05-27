@@ -52,7 +52,7 @@ def construir_matriz():
     # Reutilizamos GRID para heredar exactamente la misma zona protegida
     # que usa la planificacion. Luego solo oscurecemos las celdas que caen
     # dentro de la columna real.
-    grid_arr = np.array([[0.08 if not libre else 0.0 for libre in fila] for fila in GRID], dtype=float)
+    grid_arr = np.array([[0.08 if celda != 0 else 0.0 for celda in fila] for fila in GRID], dtype=float)
 
     for fila in range(FILAS_MAPA):
         for columna in range(COLUMNAS_MAPA):
@@ -147,7 +147,7 @@ def main():
 
     for fila, columna in camino_celdas:
         if (fila, columna) != CELDA_INICIO and (fila, columna) not in CELDAS_OBJETIVO:
-            dibujar_texto(ax, fila, columna, "*", "royalblue", tam=5, peso="bold")
+            dibujar_texto(ax, fila, columna, "*", "royalblue", tam=25, peso="bold")
 
     dibujar_texto(ax, CELDA_INICIO[0], CELDA_INICIO[1], "S", "green", tam=25, peso="bold")
     for i, celda_objetivo in enumerate(CELDAS_OBJETIVO, start=1):

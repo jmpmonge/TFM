@@ -1,12 +1,9 @@
 import os
 import sys
-import time
 
-# El script vive en herramientas/, pero los módulos del controlador
-# (algoritmo.py, config.py, heuristicas.py) están en el directorio padre.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from planificacion.algoritmos import astar, dijkstra, greedy
+from planificacion.algoritmos import ara_star, astar, dijkstra, greedy
 from configuracion.config import CELDA_INICIO, CELDA_OBJETIVO
 from planificacion.heuristicas import h_manhattan, h_euclidiana, h_nula
 
@@ -18,33 +15,21 @@ heuristicas = {
 }
 
 
-# =========================
-# EXPERIMENTO
-# =========================
+print("A* por heuristica (inicio -> objetivo)")
 for nombre, h in heuristicas.items():
-
-    inicio_t = time.time()
-
     camino, nodos = astar(CELDA_INICIO, CELDA_OBJETIVO, h)
+    print(f"{nombre:10} | celdas={len(camino):3} | nodos={nodos:4}")
 
-    fin_t = time.time()
-
-    longitud = len(camino)
-    tiempo = fin_t - inicio_t
-
-    print(f"{nombre:10} | longitud={longitud:3} | nodos={nodos:4} | tiempo={tiempo:.5f}")
-
+print()
+print("Comparacion de algoritmos (Manhattan)")
 
 algoritmos = {
     "Dijkstra": lambda: dijkstra(CELDA_INICIO, CELDA_OBJETIVO),
     "A*": lambda: astar(CELDA_INICIO, CELDA_OBJETIVO, h_manhattan),
     "Greedy": lambda: greedy(CELDA_INICIO, CELDA_OBJETIVO, h_manhattan),
+    "ARA*": lambda: ara_star(CELDA_INICIO, CELDA_OBJETIVO, h_manhattan),
 }
 
 for nombre, funcion in algoritmos.items():
-
-    t0 = time.time()
     camino, nodos = funcion()
-    t1 = time.time()
-
-    print(f"{nombre:10} | len={len(camino)} | nodos={nodos} | tiempo={t1-t0:.5f}")
+    print(f"{nombre:10} | celdas={len(camino):3} | nodos={nodos:4}")

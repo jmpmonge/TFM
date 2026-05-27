@@ -11,16 +11,15 @@ Reutiliza directamente la lógica del controlador real:
   - `filtrar_objetivos_por_bateria` y `planificar_mision` de
     `planificacion.algoritmos` (las mismas funciones que se invocan desde
     `pioneer_TFM.py`).
-  - `HEURISTICAS_DISPONIBLES` y `astar / greedy / dijkstra` también vienen
+  - `HEURISTICAS_DISPONIBLES` y `astar / greedy / dijkstra / ara_star` también vienen
     de los módulos del controlador.
 
 Uso:
     python3 controllers/pioneer_TFM/experimentos/datos_comparados.py
 
 Salida:
-  - Tabla por consola con: longitud de ruta, coste, nodos expandidos,
-    tiempo, eficiencia, factor de expansión y desviación frente a
-    A*+Manhattan.
+  - Tabla por consola con: coste, nodos expandidos, factor de expansión
+    y desviación frente a A*+Manhattan.
   - Fichero `experimentos/resultados_experimentos.csv` con las mismas
     métricas (formato apto para Excel y para la memoria del TFM).
 """
@@ -28,26 +27,28 @@ Salida:
 import csv
 import os
 import sys
-import time
 
 # Permite ejecutar este script directamente añadiendo la raíz del controlador
 # (la carpeta padre, donde están planificacion/, configuracion/, etc.) al sys.path.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from planificacion.algoritmos import (
-    astar_ponderado,
+    ara_star,
     astar,
-    dijkstra,
-    greedy,
-    aplanar_mision,
+    astar_ponderado,
     coste_movimiento,
+    dijkstra,
     filtrar_objetivos_por_bateria,
+    greedy,
     planificar_mision,
 )
-
-from configuracion.config import BATERIA_MAX, CELDA_INICIO, CELDAS_OBJETIVO
+from configuracion.config import (
+    BATERIA_MAX,
+    CELDA_INICIO,
+    CELDAS_OBJETIVO,
+    PESO_ASTAR_PONDERADO,
+)
 from planificacion.heuristicas import HEURISTICAS_DISPONIBLES
-
 
 # ============================================================================
 # UTILIDADES
@@ -71,13 +72,9 @@ def lanzar_mision(algoritmo, heuristica, inicio, base):
 # ============================================================================
 
 def medir(nombre_algoritmo, nombre_heuristica, funcion, coste_optimo_referencia):
-    t0 = time.perf_counter()
     rutas, nodos = funcion()
-    t1 = time.perf_counter()
 
     coste = calcular_coste_real_rutas(rutas)
-    tiempo = t1 - t0
-    eficiencia = (coste / nodos * 100.0) if nodos else 0.0
     expansion = (nodos / coste) if coste else 0.0
     diferencia_coste = coste - coste_optimo_referencia
 
@@ -93,8 +90,6 @@ def medir(nombre_algoritmo, nombre_heuristica, funcion, coste_optimo_referencia)
         "heuristica": nombre_heuristica,
         "coste": coste,
         "nodos": nodos,
-        "tiempo": tiempo,
-        "eficiencia": eficiencia,
         "expansion": expansion,
         "comparacion_referencia": comparacion_referencia,
     }
@@ -133,17 +128,11 @@ def imprimir_tabla(resultados):
         ("Heurística", "heuristica"),
         ("Coste total (pasos)", "coste"),
         ("Nodos expandidos", "nodos"),
-        ("Tiempo ejecución (s)", "tiempo"),
-        ("Eficiencia coste/nodos (%)", "eficiencia"),
         ("Factor expansión", "expansion"),
         ("Diferencia frente a A*+Manhattan", "comparacion_referencia"),
     ]
 
     def formatear(clave, valor):
-        if clave == "tiempo":
-            return f"{valor:.6g}"
-        if clave == "eficiencia":
-            return f"{valor:.1f}"
         if clave == "expansion":
             return f"{valor:.2f}"
         return str(valor)
@@ -177,8 +166,6 @@ def exportar_csv(resultados, ruta_csv):
         ("heuristica", "heuristica"),
         ("coste_total_pasos", "coste"),
         ("nodos_expandidos", "nodos"),
-        ("tiempo_ejecucion_s", "tiempo"),
-        ("eficiencia_coste_sobre_nodos_pct", "eficiencia"),
         ("factor_expansion_nodos_por_paso", "expansion"),
         ("diferencia_coste_frente_astar_manhattan", "comparacion_referencia"),
     ]
@@ -227,12 +214,12 @@ if __name__ == "__main__":
             ),
         ))
 
-    # A* ponderado: f(n) = g(n) + w · h(n)
-    # No probamos heurística nula porque sería equivalente a Dijkstra.
+    # A* ponderado: f(n) = g(n) + epsilon · h(n), epsilon fijo en config
+    nombre_astar_ponderado = f"WA* (ε={PESO_ASTAR_PONDERADO}"
     for nombre, clave in heuristicas:
         if clave != "nula":
             pruebas.append((
-                "A* ponderado",
+                nombre_astar_ponderado,
                 nombre,
                 lambda clave=clave: lanzar_mision(
                     astar_ponderado,
@@ -254,6 +241,20 @@ if __name__ == "__main__":
                 base
             ),
         ))
+
+    # ARA*: varias búsquedas A* ponderado con epsilon decreciente
+    for nombre, clave in heuristicas:
+        if clave != "nula":
+            pruebas.append((
+                "ARA*",
+                nombre,
+                lambda clave=clave: lanzar_mision(
+                    ara_star,
+                    HEURISTICAS_DISPONIBLES[clave],
+                    inicio,
+                    base
+                ),
+            ))
 
     # Dijkstra: f(n) = g(n)
     pruebas.append((
