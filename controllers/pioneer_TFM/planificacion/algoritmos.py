@@ -436,9 +436,9 @@ def planificar_mision(origen, objetivos, base, bateria, devolver_nodos=False,
 
 def _etiqueta_heuristica(nombre):
     if nombre == "manhattan":
-        return "📐 Manhattan"
+        return "Manhattan"
     if nombre == "euclidiana":
-        return "📏 Euclidiana"
+        return "Euclidiana"
     return nombre.upper()
 
 

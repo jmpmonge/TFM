@@ -65,15 +65,6 @@ INFO_HEURISTICAS = {
 ORDEN_MENU_ALGORITMOS = ["dijkstra", "astar", "greedy", "ara_star"]
 
 
-def _icono_heuristica(clave):
-    """Solo Manhattan y Euclidiana llevan icono en consola."""
-    if clave == "manhattan":
-        return "📐 "
-    if clave == "euclidiana":
-        return "📏 "
-    return ""
-
-
 def _linea_separadora():
     return "=" * 45
 
@@ -85,9 +76,8 @@ def etiqueta_modo_busqueda(algoritmo, heuristica=None):
     if algoritmo == "dijkstra":
         return nombre_alg
 
-    icono = _icono_heuristica(heuristica or "")
     info_h = INFO_HEURISTICAS.get(heuristica or "", {"nombre": heuristica})
-    return f"{nombre_alg} + {icono}{info_h.get('nombre', heuristica)}"
+    return f"{nombre_alg} + {info_h.get('nombre', heuristica)}"
 
 
 def _esperar_liberacion_teclas(teclado):
@@ -136,8 +126,7 @@ def _imprimir_menu_heuristica(algoritmo):
 
     for i, clave in enumerate(opciones, start=1):
         info = INFO_HEURISTICAS[clave]
-        icono = _icono_heuristica(clave)
-        print(f"  {i}) {icono}{info['nombre']}")
+        print(f"  {i}) {info['nombre']}")
         print(f"     {info['texto']}")
         print()
 
