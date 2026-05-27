@@ -1,6 +1,8 @@
 import math
 
-from configuracion.config import VELOCIDAD_AVANCE, VELOCIDAD_GIRO
+from configuracion.config import VELOCIDAD_AVANCE, VELOCIDAD_GIRO, CELL_SIZE
+
+_UMBRAL_WAYPOINT = max(0.05, CELL_SIZE * 0.6)
 
 
 def seguir_camino(estado, puntos, indice_objetivo):
@@ -15,7 +17,7 @@ def seguir_camino(estado, puntos, indice_objetivo):
     dy = py - ry
     distancia = math.hypot(dx, dy)
 
-    if distancia < 0.3:
+    if distancia < _UMBRAL_WAYPOINT:
         indice_objetivo += 1
         if indice_objetivo >= len(puntos):
             return 0.0, 0.0, indice_objetivo

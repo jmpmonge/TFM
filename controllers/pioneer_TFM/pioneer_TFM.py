@@ -1,3 +1,5 @@
+import math
+
 from simulacion import menu_heuristica
 from configuracion import config
 
@@ -28,7 +30,19 @@ CAMINO_CELDAS = aplanar_mision(rutas)
 PUNTOS = [celda_a_mundo(celda) for celda in CAMINO_CELDAS]
 INDICE_OBJETIVO = 1 if len(PUNTOS) > 1 else 0
 
-colocar_inicio(config.INICIO_MUNDO[0], config.INICIO_MUNDO[1], orientacion=0.0)
+if len(PUNTOS) > 1:
+    orientacion_inicial = math.atan2(
+        PUNTOS[1][1] - PUNTOS[0][1],
+        PUNTOS[1][0] - PUNTOS[0][0],
+    )
+else:
+    orientacion_inicial = 0.0
+
+colocar_inicio(
+    config.INICIO_MUNDO[0],
+    config.INICIO_MUNDO[1],
+    orientacion=orientacion_inicial,
+)
 
 imprimir_resumen_planificacion(
     config.CELDA_INICIO,

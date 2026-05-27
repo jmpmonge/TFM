@@ -1,33 +1,29 @@
-# ============================================================================
-# ESCALA DEL MAPA
-# ============================================================================
-# El escenario tiene dos representaciones:
-#
-# - Webots (.wbt): mundo visual en metros.
-# - Planificación: grid generado con GRID_CELLS y CELL_SIZE.
-#
-# Configuración actual:
-#   GRID_CELLS = 100
-#   CELL_SIZE = 0.2
-#   Tamaño del mundo = 100 * 0.2 = 20 x 20 m
-#
-# Por eso en worlds/pioneer3at.wbt debe aparecer:
-#   RectangleArena { floorSize 20 20 }
-#
-# Si se cambia la escala, hay que modificar de forma coherente:
-#   1) config.py: GRID_CELLS / CELL_SIZE
-#   2) worlds/pioneer3at.wbt: floorSize, muros, START, GOAL y robot
-#   3) generated_map.json: mapa de planificación generado desde el mundo
-#
-# Obstáculos:
-# Cada obstáculo rectangular tiene centro (x, z) y tamaño (size_x, size_z).
-# Al escalar el mundo, se multiplican tanto las coordenadas del centro
-# como el tamaño del obstáculo.
-#
-# Ejemplo:
-#   de 8x8 m a 20x20 m → factor = 20/8 = 2.5
-#   centro (2,1), tamaño (1,2) → centro (5,2.5), tamaño (2.5,5)
-#
-# Comprobar con:
-#   python configuracion/prueba_config.py
-# ============================================================================
+# Escala del mapa
+
+## Parejas de ficheros
+
+| Uso | Config | Mundo Webots | JSON |
+|-----|--------|--------------|------|
+| Activo | `config.py` | `worlds/pioneer3at.wbt` | `generated_map.json` |
+| Reserva | `config1.py` | `worlds/pioneer3at1.wbt` | `generated_map1.json` |
+
+Para usar la reserva: renombra la pareja reserva sobre la activa y abre el `.wbt` correspondiente en Webots.
+
+## Dónde cambiar la escala (siempre en la misma pareja)
+
+1. **`config.py`** (o `config1.py`): `CELL_SIZE`
+2. **`worlds/pioneer3at.wbt`** (o `pioneer3at1.wbt`):
+   - Una sola línea `# Mapa lógico NxN` (informativa; no repetir en otros comentarios)
+   - `RectangleArena` → `floorSize`, `floorTileSize`
+   - Coordenadas de START, GOAL, Pioneer y obstáculos
+3. **JSON**: se regenera al importar config o con `python herramientas/extract_wbt_to_json.py`
+
+Los límites del JSON salen de **`floorSize`** del `.wbt`, no del comentario del grid.
+
+## Después de editar
+
+1. Guarda el `.wbt`
+2. Reinicia la simulación en Webots
+3. Comprueba: `python configuracion/prueba_config.py`
+
+Si hay error de coordenadas, el mensaje indica si el punto queda fuera de la arena o fuera de la rejilla (desajuste entre `CELL_SIZE` y `floorSize`).

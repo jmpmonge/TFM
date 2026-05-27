@@ -1,7 +1,7 @@
 import json
 import os
 import re
-
+from configuracion.config import CELL_SIZE, OBSTACLE_RADIUS, MARGEN_SEGURIDAD, CENTRO_CELDA
 # ============================================================================
 # RUTAS
 # ============================================================================
@@ -28,11 +28,9 @@ JSON_PATH = os.path.join(_CONTROLADOR_DIR, "configuracion", "generated_map.json"
 # Esto mantiene compatibilidad con los obstáculos antiguos.
 # ============================================================================
 
-DEFAULT_OBSTACLE_RADIUS = 0.4
 
 # Tamaño de celda lógica (1 m). El número de celdas se infiere del comentario
 # "Mapa lógico NxN" del .wbt; si no aparece, se usa floorSize de la arena.
-LOGICAL_CELL_SIZE = 1.0
 
 
 # ============================================================================
@@ -239,7 +237,7 @@ def extraer_obstaculos_y_muros(lineas):
             })
 
         else:
-            radius = cylinder_radius if cylinder_radius is not None else DEFAULT_OBSTACLE_RADIUS
+            radius = cylinder_radius if cylinder_radius is not None else OBSTACLE_RADIUS
 
             obstaculos.append({
                 "name": nombre,
@@ -345,18 +343,18 @@ def generar_mapa_json(wbt_path=WBT_PATH, json_path=JSON_PATH, verbose=False):
     objetivos = extraer_objetivos(lineas)
     inicio = extraer_inicio(lineas)
 
-    medio = grid_celdas * LOGICAL_CELL_SIZE / 2.0
+    medio = grid_celdas * CELL_SIZE / 2.0
 
     datos = {
         "x_limits": [-medio, medio],
         "y_limits": [-medio, medio],
         "grid_cells": grid_celdas,
-        "cell_size": LOGICAL_CELL_SIZE,
+        "cell_size": CELL_SIZE,
 
         # Se mantiene esta clave por compatibilidad.
         # Para cilindros antiguos se usa radius.
         # Para muros nuevos se usan size_x y size_y.
-        "obstacle_radius": DEFAULT_OBSTACLE_RADIUS,
+        "obstacle_radius": OBSTACLE_RADIUS,
 
         "obstacles": obstaculos,
         "goals": objetivos,
