@@ -1,7 +1,8 @@
 import json
 import os
 import re
-from configuracion.config import CELL_SIZE, OBSTACLE_RADIUS, MARGEN_SEGURIDAD, CENTRO_CELDA
+import sys
+
 # ============================================================================
 # RUTAS
 # ============================================================================
@@ -15,6 +16,8 @@ from configuracion.config import CELL_SIZE, OBSTACLE_RADIUS, MARGEN_SEGURIDAD, C
 
 _AQUI = os.path.dirname(os.path.abspath(__file__))
 _CONTROLADOR_DIR = os.path.dirname(_AQUI)
+if _CONTROLADOR_DIR not in sys.path:
+    sys.path.insert(0, _CONTROLADOR_DIR)
 _ROOT_DIR = os.path.dirname(os.path.dirname(_CONTROLADOR_DIR))
 
 WBT_PATH = os.path.join(_ROOT_DIR, "worlds", "pioneer3at.wbt")
@@ -31,6 +34,17 @@ JSON_PATH = os.path.join(_CONTROLADOR_DIR, "configuracion", "generated_map.json"
 
 # Tamaño de celda lógica (1 m). El número de celdas se infiere del comentario
 # "Mapa lógico NxN" del .wbt; si no aparece, se usa floorSize de la arena.
+
+
+def _parametros_mapa():
+    """
+    Lee CELL_SIZE y OBSTACLE_RADIUS del config activo (config.py o config2 renombrado).
+
+    Importación diferida: config.py importa este módulo al cargarse; un import
+    al inicio del archivo provocaría importación circular.
+    """
+    from configuracion import config
+    return config.CELL_SIZE, config.OBSTACLE_RADIUS
 
 
 # ============================================================================
@@ -184,7 +198,7 @@ def inferir_grid_celdas(lineas, floor_x):
 # EXTRAER OBSTÁCULOS Y MUROS
 # ============================================================================
 
-def extraer_obstaculos_y_muros(lineas):
+def extraer_obstaculos_y_muros(lineas, obstacle_radius=0.0):
     """
     Extrae obstáculos del mundo Webots.
 
@@ -237,7 +251,7 @@ def extraer_obstaculos_y_muros(lineas):
             })
 
         else:
-            radius = cylinder_radius if cylinder_radius is not None else OBSTACLE_RADIUS
+            radius = cylinder_radius if cylinder_radius is not None else obstacle_radius
 
             obstaculos.append({
                 "name": nombre,
@@ -338,23 +352,25 @@ def generar_mapa_json(wbt_path=WBT_PATH, json_path=JSON_PATH, verbose=False):
     if floor_x is None or floor_y is None:
         raise ValueError("No se ha encontrado floorSize en RectangleArena.")
 
+    cell_size, obstacle_radius = _parametros_mapa()
+
     grid_celdas = inferir_grid_celdas(lineas, floor_x)
-    obstaculos = extraer_obstaculos_y_muros(lineas)
+    obstaculos = extraer_obstaculos_y_muros(lineas, obstacle_radius=obstacle_radius)
     objetivos = extraer_objetivos(lineas)
     inicio = extraer_inicio(lineas)
 
-    medio = grid_celdas * CELL_SIZE / 2.0
+    medio = grid_celdas * cell_size / 2.0
 
     datos = {
         "x_limits": [-medio, medio],
         "y_limits": [-medio, medio],
         "grid_cells": grid_celdas,
-        "cell_size": CELL_SIZE,
+        "cell_size": cell_size,
 
         # Se mantiene esta clave por compatibilidad.
         # Para cilindros antiguos se usa radius.
         # Para muros nuevos se usan size_x y size_y.
-        "obstacle_radius": OBSTACLE_RADIUS,
+        "obstacle_radius": obstacle_radius,
 
         "obstacles": obstaculos,
         "goals": objetivos,

@@ -36,20 +36,19 @@ EPSILON_PASO_ARA = 0.5
 PESO_ASTAR_PONDERADO = 1.5
 
 # ============================================================================
-# AJUSTES DEL MAPA
+# MAPA AMPLIO (40×40 m, celdas 0.17 m → 235×235)
+# Copia de trabajo: renombrar a config.py (+ pioneer3at.wbt) para usarlo.
+# Usa worlds/pioneer3at1.wbt y generated_map2.json (no pisa el mapa 8×8).
+# Ver manual2.md
 # ============================================================================
-# Tamaño de cada celda en metros.
+CELL_SIZE = 0.17
 
-# En terreno de 7x7 metros, cada celda es de 1 metro de lado.
-CELL_SIZE = 1
-
-# El robot es ~0.5 m y queremos que ocupe 3x3 celdas → 0.5 / 3 ≈ 0.17 m
-# CELL_SIZE = 0.17
+# El robot mide ~0.5 m 
 CENTRO_CELDA = CELL_SIZE / 2
 
 # para mapa 7x7
-OBSTACLE_RADIUS = 0.0 # Radio de los obstáculos en metros∫
-MARGEN_SEGURIDAD = 0.0
+OBSTACLE_RADIUS = 0.2 # Radio de los obstáculos en metros∫
+MARGEN_SEGURIDAD = 0.6
 # para mapa amplio
 # OBSTACLE_RADIUS = 0.4 # Radio de los obstáculos en metros∫
 # MARGEN_SEGURIDAD = 0.6 # Margen extra para no rozar columnas en metros
@@ -62,8 +61,7 @@ OBJETIVOS_MUNDO_POR_DEFECTO = [
 BATERIA_MAX = 800 # NÚMERO DE UNIDADES DE BATERÍA, 1 UNIDAD = PASO DE 32ms
 
 # ============================================================================
-# SINCRONIZAR Y LEER MAPA DESDE JSON
-# Si pioneer3at.wbt cambió, se regenera generated_map.json al importar config.
+# SINCRONIZAR Y LEER MAPA DESDE JSON (variante mapa amplio)
 # ============================================================================
 import sys
 
@@ -71,11 +69,18 @@ _CONTROLLER_DIR = _AQUI.parent
 if str(_CONTROLLER_DIR) not in sys.path:
     sys.path.insert(0, str(_CONTROLLER_DIR))
 
+_ROOT_DIR = _CONTROLLER_DIR.parent.parent
+_WBT_MAPA = _ROOT_DIR / "worlds" / "pioneer3at.wbt"
+_JSON_MAPA = _AQUI / "generated_map.json"
+
 from herramientas.extract_wbt_to_json import sincronizar_si_necesario
 
-_JSON_MAPA = _AQUI / "generated_map.json"
-if sincronizar_si_necesario(verbose=False):
-    print("[config] Mapa actualizado desde worlds/pioneer3at.wbt")
+if sincronizar_si_necesario(
+    wbt_path=str(_WBT_MAPA),
+    json_path=str(_JSON_MAPA),
+    verbose=False,
+):
+    print("[config2] Mapa actualizado desde worlds/pioneer3at1.wbt")
 
 with open(_JSON_MAPA, "r", encoding="utf-8") as f:
     mapa = json.load(f)

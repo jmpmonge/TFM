@@ -1,79 +1,79 @@
 {
   "x_limits": [
-    -19.975,
-    19.975
+    -4.0,
+    4.0
   ],
   "y_limits": [
-    -19.975,
-    19.975
+    -4.0,
+    4.0
   ],
-  "grid_cells": 235,
-  "cell_size": 0.17,
-  "obstacle_radius": 0.2,
+  "grid_cells": 8,
+  "cell_size": 1,
+  "obstacle_radius": 0.0,
   "obstacles": [
     {
       "name": "WALL_TOP",
       "type": "box",
-      "x": -2.5,
-      "y": 12.5,
+      "x": -0.5,
+      "y": 2.5,
       "z": 0.25,
-      "size_x": 25.0,
+      "size_x": 5.0,
       "size_y": 1.0,
       "size_z": 0.5
     },
     {
       "name": "WALL_LEFT",
       "type": "box",
-      "x": -12.5,
-      "y": -2.5,
+      "x": -2.5,
+      "y": -0.5,
       "z": 0.25,
       "size_x": 1.0,
-      "size_y": 25.0,
+      "size_y": 5.0,
       "size_z": 0.5
     },
     {
       "name": "WALL_RIGHT",
       "type": "box",
-      "x": 7.5,
+      "x": 1.5,
       "y": 0.0,
       "z": 0.25,
-      "size_x": 5.0,
-      "size_y": 20.0,
+      "size_x": 1.0,
+      "size_y": 4.0,
       "size_z": 0.5
     },
     {
       "name": "WALL_INNER_VERTICAL",
       "type": "box",
-      "x": -2.5,
-      "y": -2.5,
+      "x": -0.5,
+      "y": -0.5,
       "z": 0.25,
-      "size_x": 5.0,
-      "size_y": 15.0,
+      "size_x": 1.0,
+      "size_y": 3.0,
       "size_z": 0.5
     },
     {
       "name": "WALL_INNER_BOTTOM",
       "type": "box",
-      "x": 2.5,
-      "y": -7.5,
+      "x": 0.5,
+      "y": -1.5,
       "z": 0.25,
-      "size_x": 5.0,
-      "size_y": 5.0,
+      "size_x": 1.0,
+      "size_y": 1.0,
       "size_z": 0.5
     }
   ],
   "goals": [
     {
       "name": "GOAL_ARA",
-      "x": 2.55,
-      "y": -2.55,
+      "x": 0.5,
+      "y": -0.5,
       "z": 0.55
     }
   ],
   "start": {
     "name": "START",
-    "x": -17.51,
-    "y": 17.51,
+    "x": -3.5,
+    "y": 3.5,
     "z": 0.015
   }
 }
