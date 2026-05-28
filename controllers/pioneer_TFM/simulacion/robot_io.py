@@ -64,15 +64,19 @@ def colocar_meta(x, y, z=1.0, goal_def="GOAL_1"):
         nodo.getField("translation").setSFVec3f([float(x), float(y), float(z)])
 
 
-def dibujar_bateria(bateria_actual, bateria_max):
+def dibujar_bateria(bateria_actual, bateria_max, valor_grid=0, consumo_celda=None):
+    """Display de batería; opcionalmente avisa si el robot está en zona de coste."""
     if display is None:
         return
+
+    if consumo_celda is None:
+        consumo_celda = 1.0 if valor_grid == 0 else float(valor_grid)
 
     ancho_display = display.getWidth()
     alto_display = display.getHeight()
     margen = 8
     ancho_barra = max(12, ancho_display - 2 * margen)
-    alto_barra = max(10, alto_display - 20)
+    alto_barra = max(8, min(12, alto_display - 28))
 
     if bateria_max <= 0:
         proporcion = 0.0
@@ -80,21 +84,65 @@ def dibujar_bateria(bateria_actual, bateria_max):
         proporcion = max(0.0, min(1.0, bateria_actual / bateria_max))
 
     ancho_relleno = int(ancho_barra * proporcion)
+    en_zona = valor_grid > 0
+    zona_cara = valor_grid >= 10
+    zona_muy_cara = valor_grid >= 30
 
-    if proporcion > 0.5:
-        color = 0x00FF00
+    if en_zona:
+        if zona_muy_cara:
+            color_barra = 0xFF2200
+        elif zona_cara:
+            color_barra = 0xFF6600
+        else:
+            color_barra = 0xFFAA00
+    elif proporcion > 0.5:
+        color_barra = 0x00FF00
     elif proporcion > 0.2:
-        color = 0xFFFF00
+        color_barra = 0xFFFF00
     else:
-        color = 0xFF0000
+        color_barra = 0xFF0000
+
+    if en_zona:
+        if zona_muy_cara:
+            color_texto = 0xFF4400
+        elif zona_cara:
+            color_texto = 0xFF8800
+        else:
+            color_texto = 0xFFCC00
+    else:
+        color_texto = 0xFFFFFF
 
     display.setColor(0x000000)
     display.fillRectangle(0, 0, ancho_display, alto_display)
-    display.setColor(0xFFFFFF)
+
+    display.setColor(color_texto)
     display.drawText(f"Bateria: {int(bateria_actual)}/{int(bateria_max)}", margen, 0)
-    display.drawRectangle(margen, 14, ancho_barra, alto_barra)
-    display.setColor(color)
-    display.fillRectangle(margen + 1, 15, max(0, ancho_relleno - 2), max(0, alto_barra - 2))
+
+    y_barra = 14
+    if en_zona:
+        borde = 0xFF0000 if zona_muy_cara else (0xFF6600 if zona_cara else 0xFFAA00)
+        display.setColor(borde)
+        display.drawRectangle(margen - 1, y_barra - 1, ancho_barra + 2, alto_barra + 2)
+
+    display.setColor(0xFFFFFF)
+    display.drawRectangle(margen, y_barra, ancho_barra, alto_barra)
+    display.setColor(color_barra)
+    display.fillRectangle(margen + 1, y_barra + 1, max(0, ancho_relleno - 2), max(0, alto_barra - 2))
+
+    if en_zona:
+        etiqueta = "ZONA CARA" if zona_cara else "ZONA COSTE"
+        texto_zona = f"{etiqueta}: {int(consumo_celda)}"
+        y_aviso = y_barra + alto_barra + 4
+        if y_aviso + 10 <= alto_display:
+            if zona_muy_cara:
+                display.setColor(0x550000)
+            elif zona_cara:
+                display.setColor(0x663300)
+            else:
+                display.setColor(0x554400)
+            display.fillRectangle(margen, y_aviso, ancho_barra, 10)
+            display.setColor(0xFFAA00 if not zona_cara else 0xFF4400)
+            display.drawText(texto_zona, margen + 1, y_aviso + 1)
 
 
 def fijar_velocidad_ruedas(velocidad_izquierda, velocidad_derecha):

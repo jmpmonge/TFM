@@ -323,14 +323,19 @@ def obtener_factores_terreno(celda):
 
     return FACTORES_TERRENO.get(celda, factores_por_defecto)
 
+def coste_base_celda(celda):
+    """Coste base del terreno: celda libre (0) → 1; valor > 0 → ese valor."""
+    valor = config.GRID[celda[0]][celda[1]]
+    return 1.0 if valor == 0 else float(valor)
+
+
 def coste_movimiento(actual, vecino):
     """
     Coste g(n) de entrar en la celda vecino según GRID y tipo de paso:
-    - ortogonal: coste base de la celda (0→1, >1→ese valor)
+    - ortogonal: coste base de la celda
     - diagonal: coste base × sqrt(2)
     """
-    valor = config.GRID[vecino[0]][vecino[1]]
-    base = 1.0 if valor == 0 else float(valor)
+    base = coste_base_celda(vecino)
 
     df = abs(vecino[0] - actual[0])
     dc = abs(vecino[1] - actual[1])
@@ -348,6 +353,50 @@ def coste_camino(camino):
     for i in range(1, len(camino)):
         total += coste_movimiento(camino[i - 1], camino[i])
     return total
+
+
+def coste_bateria_movimiento(actual, vecino):
+    """
+    Consumo energético al pasar de actual a vecino.
+    Usa el mismo coste base del terreno; el factor diagonal depende de config.
+    """
+    base = coste_base_celda(vecino)
+
+    if config.USAR_FACTOR_DIAGONAL_BATERIA:
+        df = abs(vecino[0] - actual[0])
+        dc = abs(vecino[1] - actual[1])
+        if df == 1 and dc == 1:
+            return base * math.sqrt(2)
+    return base
+
+
+def coste_bateria_camino(camino):
+    """Batería consumida recorriendo un camino de celdas consecutivas."""
+    if len(camino) <= 1:
+        return 0.0
+
+    total = 0.0
+    for i in range(1, len(camino)):
+        total += coste_bateria_movimiento(camino[i - 1], camino[i])
+    return total
+
+
+def log_consumo_bateria_celda(celda, origen, consumo_tramo, consumo_acum, bateria_restante):
+    """Consola de depuración: una línea por celda atravesada."""
+    if not config.LOG_BATERIA_CELDAS:
+        return
+
+    valor_grid = config.GRID[celda[0]][celda[1]]
+    factor_diag = "×√2" if (
+        config.USAR_FACTOR_DIAGONAL_BATERIA
+        and abs(celda[0] - origen[0]) == 1
+        and abs(celda[1] - origen[1]) == 1
+    ) else ""
+    print(
+        f"[BATERIA] celda={celda} valor_grid={valor_grid} "
+        f"consumo_celda={consumo_tramo:.2f}{factor_diag} "
+        f"acumulado={consumo_acum:.2f} restante={bateria_restante:.2f}"
+    )
 
 
 def _buscar_camino(inicio, objetivo, heuristica=None, usar_coste=True, peso_heuristica=1.0):
@@ -494,18 +543,33 @@ def ordenar_objetivos(origen, objetivos):
     return sorted(objetivos, key=lambda obj: h_manhattan(origen, obj))
 
 
-def filtrar_objetivos_por_bateria(origen, objetivos, base, bateria):
+def filtrar_objetivos_por_bateria(origen, objetivos, base, bateria,
+                                  algoritmo=None, heuristica=None):
+    """Filtra objetivos según batería usando rutas planificadas y coste_bateria_camino."""
+    funcion = _normalizar_algoritmo(algoritmo)
+    h = _normalizar_heuristica(heuristica)
     objetivos_ordenados = ordenar_objetivos(origen, objetivos)
 
     objetivos_validos = []
-    coste_total = 0
+    coste_total = 0.0
     posicion_actual = origen
 
     for obj in objetivos_ordenados:
-        coste_hasta_obj = h_manhattan(posicion_actual, obj)
-        coste_vuelta_base = h_manhattan(obj, base)
+        camino_ida, _ = funcion(posicion_actual, obj, h)
+        if not camino_ida:
+            break
+        coste_hasta_obj = coste_bateria_camino(camino_ida)
+
+        camino_vuelta, _ = funcion(obj, base, h)
+        coste_vuelta_base = coste_bateria_camino(camino_vuelta) if camino_vuelta else float("inf")
 
         if coste_total + coste_hasta_obj + coste_vuelta_base > bateria:
+            if config.LOG_BATERIA_OBJETIVOS:
+                print(
+                    f"[BATERIA] objetivo {obj} descartado: "
+                    f"coste_mision={coste_total + coste_hasta_obj:.1f} + "
+                    f"vuelta={coste_vuelta_base:.1f} > {bateria}"
+                )
             break
 
         objetivos_validos.append(obj)
@@ -550,7 +614,9 @@ def planificar_mision(origen, objetivos, base, bateria, devolver_nodos=False,
         # Se vacia al inicio; preparar_ruta ira anadiendo un informe por tramo.
         INFORME_ARA_MISION = []
 
-    objetivos_validos = filtrar_objetivos_por_bateria(origen, objetivos, base, bateria)
+    objetivos_validos = filtrar_objetivos_por_bateria(
+        origen, objetivos, base, bateria, algoritmo=funcion, heuristica=h
+    )
 
     rutas = []
     nodos_totales = 0
@@ -629,6 +695,7 @@ def imprimir_detalle_informe_ara(informe):
 def imprimir_resumen_planificacion(inicio, objetivos, camino, nodos_totales):
     """Resumen en consola tras planificar la mision."""
     coste = coste_camino(camino)
+    coste_energia = coste_bateria_camino(camino)
 
     print()
     print("=" * 45)
@@ -639,7 +706,9 @@ def imprimir_resumen_planificacion(inicio, objetivos, camino, nodos_totales):
     print("Inicio grid :", inicio)
     print("Objetivos   :", objetivos)
     print("Longitud    :", len(camino), "celdas")
-    print("Coste final :", coste, "pasos")
+    print("Coste g     :", f"{coste:.2f}", "(planificacion)")
+    print("Coste energia:", f"{coste_energia:.2f}", "(bateria)")
+    print("Factor diag.:", config.USAR_FACTOR_DIAGONAL_BATERIA)
     print("Nodos vistos:", nodos_totales)
 
     if config.ALGORITMO == "ara_star" and INFORME_ARA_MISION:

@@ -28,7 +28,7 @@ HEURISTICA = "octil" # "manhattan" | "euclidiana" | "octil"
 # Parámetros de ARA* (ε = peso de la heurística en cada iteración)
 # ε alto  → ruta más rápida de calcular
 # ε = 1.0 → mismo criterio que A* normal
-EPSILON_INICIAL_ARA = 2.5
+EPSILON_INICIAL_ARA = 3
 EPSILON_FINAL_ARA = 1.0
 EPSILON_PASO_ARA = 0.5
 
@@ -36,16 +36,16 @@ EPSILON_PASO_ARA = 0.5
 MODO_ARA = "offline"
 
 # Pasos simulados por fase en modo anytime_simple (celdas avanzadas entre recalculos)
-PASOS_POR_FASE_ARA = 10
+PASOS_POR_FASE_ARA = 5
 
 # Peso fijo del A* ponderado en comparativas: f(n) = g(n) + epsilon * h(n)
 PESO_ASTAR_PONDERADO = 1.5
 
-# Coste g de la zona especifica (geometria COST_ZONE_* en el .wbt). Cambiar solo aqui.
-COSTE_ZONA_ESPECIFICA = 2
-
-# Alias interno (misma variable)
-COSTE_ZONA_AZUL = COSTE_ZONA_ESPECIFICA
+# Coste g de cada zona (geometria en pioneer3at.wbt). Cambiar solo aqui.
+# Zona 1 = azul (COST_ZONE_2) | Zona 2 = marron (COST_ZONE_3) | Zona 3 = amarilla (COST_ZONE_4)
+COSTE_ZONA_1 = 20
+COSTE_ZONA_2 = 1
+COSTE_ZONA_3 = 30
 
 # ============================================================================
 # MAPA — laberinto (worlds/pioneer3at.wbt)
@@ -58,6 +58,12 @@ OBJETIVOS_MUNDO_POR_DEFECTO = [
     (-4.25, 7.25),
 ]
 BATERIA_MAX = 800 # NÚMERO DE UNIDADES DE BATERÍA, 1 UNIDAD = PASO DE 32ms
+# Consumo por celda: libre (0) → 1; zona de coste → valor del grid.
+# Si True, pasos diagonales consumen coste_celda × sqrt(2) (como la planificación).
+USAR_FACTOR_DIAGONAL_BATERIA = False
+# Logs de batería en consola (el display visual usa dibujar_bateria()).
+LOG_BATERIA_CELDAS = False      # una línea por celda recorrida (depuración)
+LOG_BATERIA_OBJETIVOS = True    # objetivos descartados por falta de batería
 
 # ============================================================================
 # CARGAR MAPA DESDE WBT (siempre al importar config / arrancar controlador)
@@ -214,34 +220,47 @@ for row in range(FILAS_MAPA):
 
 GRID = aplicar_margen_contorno(_GRID_BASE)
 
-# Zonas de coste: geometria del .wbt; el coste g lo define COSTE_ZONA_ESPECIFICA arriba.
+# 3 zonas de coste: geometria en .wbt, coste g en COSTE_ZONA_1/2/3 arriba.
 ZONAS_COSTE = mapa.get("cost_zones", [])
 
-CELDAS_ZONA_ESPECIFICA = []
+_MAPA_COSTES_ZONA = {
+    "COST_ZONE_2": lambda: COSTE_ZONA_1,
+    "COST_ZONE_3": lambda: COSTE_ZONA_2,
+    "COST_ZONE_4": lambda: COSTE_ZONA_3,
+}
+
+
+def coste_de_zona(nombre):
+    """Devuelve el coste g configurado para COST_ZONE_2, _3 o _4."""
+    fn = _MAPA_COSTES_ZONA.get(nombre)
+    return fn() if fn else 1.0
+
+
+CELDAS_POR_ZONA = {}
 for _zona in ZONAS_COSTE:
+    _nombre = _zona["name"]
+    _coste = coste_de_zona(_nombre)
+    _celdas = []
     for _row, _col in _zona.get("grid", {}).get("cells", []):
         if GRID[_row][_col] == 0:
-            CELDAS_ZONA_ESPECIFICA.append((_row, _col))
-            GRID[_row][_col] = COSTE_ZONA_ESPECIFICA
+            GRID[_row][_col] = _coste
+            _celdas.append((_row, _col))
+    CELDAS_POR_ZONA[_nombre] = _celdas
 
 
-def aplicar_coste_zona_especifica(coste=None):
-    """Actualiza COSTE_ZONA_ESPECIFICA y lo escribe en las celdas de la zona."""
-    global COSTE_ZONA_ESPECIFICA, COSTE_ZONA_AZUL
-    if coste is not None:
-        COSTE_ZONA_ESPECIFICA = float(coste)
-        COSTE_ZONA_AZUL = COSTE_ZONA_ESPECIFICA
-    for _row, _col in CELDAS_ZONA_ESPECIFICA:
-        GRID[_row][_col] = COSTE_ZONA_ESPECIFICA
-
-if ZONAS_COSTE:
-    _g0 = ZONAS_COSTE[0].get("grid", {})
-    ZONA_COSTE_FILA_INI = _g0.get("row_ini")
-    ZONA_COSTE_FILA_FIN = (_g0.get("row_fin") + 1) if _g0.get("row_fin") is not None else None
-    ZONA_COSTE_COL_INI = _g0.get("col_ini")
-    ZONA_COSTE_COL_FIN = (_g0.get("col_fin") + 1) if _g0.get("col_fin") is not None else None
-else:
-    ZONA_COSTE_FILA_INI = ZONA_COSTE_FILA_FIN = ZONA_COSTE_COL_INI = ZONA_COSTE_COL_FIN = None
+def aplicar_costes_zonas(zona1=None, zona2=None, zona3=None):
+    """Actualiza COSTE_ZONA_1/2/3 y reescribe el GRID de cada zona."""
+    global COSTE_ZONA_1, COSTE_ZONA_2, COSTE_ZONA_3
+    if zona1 is not None:
+        COSTE_ZONA_1 = float(zona1)
+    if zona2 is not None:
+        COSTE_ZONA_2 = float(zona2)
+    if zona3 is not None:
+        COSTE_ZONA_3 = float(zona3)
+    for _nombre, _celdas in CELDAS_POR_ZONA.items():
+        _coste = coste_de_zona(_nombre)
+        for _row, _col in _celdas:
+            GRID[_row][_col] = _coste
 
 # ============================================================================
 # COMPROBAR START Y GOAL
@@ -304,7 +323,9 @@ def imprimir_configuracion_planificacion():
     print("Algoritmo:", _ETIQUETAS_ALGORITMO.get(ALGORITMO, ALGORITMO))
     if ALGORITMO != "dijkstra":
         print("Heuristica:", _ETIQUETAS_HEURISTICA.get(HEURISTICA, HEURISTICA))
-    print("Coste zona especifica:", COSTE_ZONA_ESPECIFICA)
+    print("Coste zona 1 (azul)  :", COSTE_ZONA_1)
+    print("Coste zona 2 (marron):", COSTE_ZONA_2)
+    print("Coste zona 3 (amar.) :", COSTE_ZONA_3)
     if ALGORITMO == "ara_star":
         print("Modo ARA:", MODO_ARA)
         if MODO_ARA == "anytime_simple":

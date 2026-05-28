@@ -43,7 +43,10 @@ from configuracion.config import (
     HEURISTICA,
     MODO_ARA,
     PASOS_POR_FASE_ARA,
-    COSTE_ZONA_ESPECIFICA,
+    COSTE_ZONA_1,
+    COSTE_ZONA_2,
+    COSTE_ZONA_3,
+    coste_de_zona,
     ZONAS_COSTE,
     _GRID_BASE,
     imprimir_configuracion_planificacion,
@@ -112,7 +115,7 @@ def dibujar_contorno_exterior(ax):
 
 
 def dibujar_zonas_coste(ax):
-    """Pinta el rectángulo lógico de cada COST_ZONE_* y resalta celdas transitables con coste."""
+    """Pinta cada COST_ZONE_* con su color del .wbt y resalta celdas transitables con coste."""
     for zona in ZONAS_COSTE:
         grid_info = zona.get("grid", {})
         row_ini = grid_info.get("row_ini")
@@ -122,6 +125,7 @@ def dibujar_zonas_coste(ax):
         if None in (row_ini, row_fin, col_ini, col_fin):
             continue
 
+        color = tuple(zona.get("color", COLOR_ZONA_COSTE))
         ancho = col_fin - col_ini + 1
         alto = row_fin - row_ini + 1
         ax.add_patch(
@@ -129,8 +133,8 @@ def dibujar_zonas_coste(ax):
                 (col_ini - 0.5, row_ini - 0.5),
                 ancho,
                 alto,
-                facecolor=COLOR_ZONA_COSTE,
-                edgecolor=COLOR_ZONA_COSTE,
+                facecolor=color,
+                edgecolor=color,
                 alpha=0.22,
                 linewidth=1.2,
                 zorder=3,
@@ -145,8 +149,8 @@ def dibujar_zonas_coste(ax):
                     (col - 0.5, row - 0.5),
                     1,
                     1,
-                    facecolor=COLOR_ZONA_COSTE,
-                    edgecolor=COLOR_ZONA_COSTE,
+                    facecolor=color,
+                    edgecolor=color,
                     alpha=0.72,
                     linewidth=0.8,
                     zorder=4,
@@ -155,18 +159,30 @@ def dibujar_zonas_coste(ax):
 
 
 def _leyenda_zonas_coste():
-    """Coste de la zona especifica: lee COSTE_ZONA_ESPECIFICA de config.py."""
+    """Una entrada por zona con su color del .wbt y coste g de config."""
     if not ZONAS_COSTE:
         return []
 
-    return [
-        Patch(
-            facecolor=COLOR_ZONA_COSTE,
-            edgecolor=COLOR_ZONA_COSTE,
-            alpha=0.55,
-            label=f"Zona de coste: coste = {COSTE_ZONA_ESPECIFICA:g}",
+    _etiquetas = {
+        "COST_ZONE_2": "Zona 1 azul (arriba)",
+        "COST_ZONE_3": "Zona 2 marron (izquierda)",
+        "COST_ZONE_4": "Zona 3 amarilla (centro)",
+    }
+    entradas = []
+    for zona in ZONAS_COSTE:
+        nombre = zona["name"]
+        color = tuple(zona.get("color", COLOR_ZONA_COSTE))
+        coste = coste_de_zona(nombre)
+        etiqueta = _etiquetas.get(nombre, nombre)
+        entradas.append(
+            Patch(
+                facecolor=color,
+                edgecolor=color,
+                alpha=0.55,
+                label=f"{etiqueta}: coste g = {coste:g}",
+            )
         )
-    ]
+    return entradas
 
 
 def construir_capa_terreno():
@@ -290,7 +306,7 @@ def main():
         else:
             modo += " | offline"
 
-    modo += f" | coste zona={COSTE_ZONA_ESPECIFICA:g}"
+    modo += f" | costes zona={COSTE_ZONA_1:g}/{COSTE_ZONA_2:g}/{COSTE_ZONA_3:g}"
 
     ax.set_title(
         f"Mapa {FILAS_MAPA}x{COLUMNAS_MAPA} | {modo} | "
