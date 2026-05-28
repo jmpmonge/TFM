@@ -6,7 +6,7 @@ from simulacion.robot_io import TIEMPO_PASO, supervisor
 # ============================================================================
 # MENÚ DE PLANIFICACIÓN
 # ============================================================================
-# Muestra opciones en la consola de Webots. El usuario pulsa 1, 2, 3 o 4
+# Muestra opciones en la consola de Webots. El usuario pulsa números
 # con el foco en la ventana 3D (no en la consola).
 # ============================================================================
 
@@ -17,14 +17,7 @@ TECLAS_ALGORITMO = {
     52: "ara_star",  # 4
 }
 
-TECLAS_HEURISTICA_ASTAR = {
-    49: "nula",       # 1
-    50: "manhattan",  # 2
-    51: "euclidiana", # 3
-    52: "octil",      # 4
-}
-
-TECLAS_HEURISTICA_GREEDY = {
+TECLAS_HEURISTICA = {
     49: "manhattan",  # 1
     50: "euclidiana", # 2
     51: "octil",      # 3
@@ -35,14 +28,26 @@ TECLAS_MODO_ARA = {
     50: "anytime_simple",  # 2
 }
 
+TECLAS_COSTE_ZONA = {
+    49: 2,   # 1
+    50: 5,   # 2
+    51: 10,  # 3
+}
+
+TECLAS_PASOS_FASE = {
+    49: 5,   # 1
+    50: 10,  # 2
+    51: 20,  # 3
+}
+
 INFO_MODO_ARA = {
     "offline": {
-        "nombre": "ARA* offline",
-        "texto": "Calcula todas las rutas (epsilon decreciente) y luego mueve.",
+        "nombre": "offline",
+        "texto": "Calcula todos los epsilon y devuelve la ruta final.",
     },
     "anytime_simple": {
-        "nombre": "ARA* anytime simple",
-        "texto": "Avanza por fases y puede cambiar de trayectoria al mejorar epsilon.",
+        "nombre": "anytime_simple",
+        "texto": "Avanza por fases y recalcula desde la posicion alcanzada.",
     },
 }
 
@@ -66,16 +71,12 @@ INFO_ALGORITMOS = {
 }
 
 INFO_HEURISTICAS = {
-    "nula": {
-        "nombre": "Nula",
-        "texto": "Sin estimación. En A* equivale a Dijkstra.",
-    },
     "manhattan": {
         "nombre": "Manhattan",
         "texto": "Distancia en filas y columnas (como un tablero).",
     },
     "euclidiana": {
-        "nombre": "Euclidiana",
+        "nombre": "Euclídea",
         "texto": "Distancia en línea recta.",
     },
     "octil": {
@@ -85,7 +86,7 @@ INFO_HEURISTICAS = {
 }
 
 ORDEN_MENU_ALGORITMOS = ["dijkstra", "astar", "greedy", "ara_star"]
-
+OPCIONES_HEURISTICA = ["manhattan", "euclidiana", "octil"]
 
 
 def _linea_separadora():
@@ -118,6 +119,16 @@ def _esperar_liberacion_teclas(teclado):
             return
 
 
+def _esperar_tecla(teclado, teclas_validas):
+    _esperar_liberacion_teclas(teclado)
+    while supervisor.step(TIEMPO_PASO) != -1:
+        tecla = teclado.getKey()
+        if tecla in teclas_validas:
+            _esperar_liberacion_teclas(teclado)
+            return teclas_validas[tecla]
+    return None
+
+
 def _imprimir_menu_algoritmos():
     print()
     print(_linea_separadora())
@@ -144,19 +155,7 @@ def _imprimir_menu_heuristica(algoritmo):
     print("La heuristica estima cuanto falta hasta el objetivo.")
     print()
 
-    if algoritmo == "ara_star":
-        print("ARA* repite la busqueda reduciendo epsilon en cada paso.")
-        print(f"  epsilon inicio: {config.EPSILON_INICIAL_ARA}")
-        print(f"  epsilon final : {config.EPSILON_FINAL_ARA}")
-        print(f"  modo actual   : {config.MODO_ARA}")
-        print()
-
-    if algoritmo == "greedy":
-        opciones = ["manhattan", "euclidiana", "octil"]
-    else:
-        opciones = ["nula", "manhattan", "euclidiana", "octil"]
-
-    for i, clave in enumerate(opciones, start=1):
+    for i, clave in enumerate(OPCIONES_HEURISTICA, start=1):
         info = INFO_HEURISTICAS[clave]
         print(f"  {i}) {info['nombre']}")
         print(f"     {info['texto']}")
@@ -166,55 +165,21 @@ def _imprimir_menu_heuristica(algoritmo):
     print(_linea_separadora())
 
 
-def elegir_algoritmo():
-    teclado = supervisor.getKeyboard()
-    teclado.enable(TIEMPO_PASO)
+def _imprimir_menu_coste_zona():
+    print()
+    print(_linea_separadora())
+    print("ELIGE EL COSTE DE LA ZONA ESPECIFICA")
+    print(_linea_separadora())
+    print("Zona rectangular del mapa (COST_ZONE en el .wbt).")
+    print(f"  Valor actual: {config.COSTE_ZONA_ESPECIFICA}")
+    print()
 
-    _imprimir_menu_algoritmos()
-    sys.stdout.flush()
+    for i, coste in enumerate(TECLAS_COSTE_ZONA.values(), start=1):
+        print(f"  {i}) coste zona = {coste}")
+    print()
 
-    _esperar_liberacion_teclas(teclado)
-
-    while supervisor.step(TIEMPO_PASO) != -1:
-        tecla = teclado.getKey()
-
-        if tecla in TECLAS_ALGORITMO:
-            elegido = TECLAS_ALGORITMO[tecla]
-            _esperar_liberacion_teclas(teclado)
-            return elegido
-
-    return config.ALGORITMO
-
-
-def elegir_heuristica(algoritmo):
-    if algoritmo == "dijkstra":
-        return "nula"
-
-    teclado = supervisor.getKeyboard()
-    teclado.enable(TIEMPO_PASO)
-
-    if algoritmo in ("astar", "ara_star", "greedy"):
-        _imprimir_menu_heuristica(algoritmo)
-        teclas_heuristica = (
-            TECLAS_HEURISTICA_ASTAR
-            if algoritmo in ("astar", "ara_star")
-            else TECLAS_HEURISTICA_GREEDY
-        )
-    else:
-        return config.HEURISTICA
-
-    sys.stdout.flush()
-    _esperar_liberacion_teclas(teclado)
-
-    while supervisor.step(TIEMPO_PASO) != -1:
-        tecla = teclado.getKey()
-
-        if tecla in teclas_heuristica:
-            elegida = teclas_heuristica[tecla]
-            _esperar_liberacion_teclas(teclado)
-            return elegida
-
-    return config.HEURISTICA
+    print("Pulsa 1, 2 o 3 en la ventana 3D de Webots.")
+    print(_linea_separadora())
 
 
 def _imprimir_menu_modo_ara():
@@ -233,42 +198,99 @@ def _imprimir_menu_modo_ara():
     print(_linea_separadora())
 
 
+def _imprimir_menu_pasos_fase():
+    print()
+    print(_linea_separadora())
+    print("ELIGE LOS PASOS POR FASE (ANYTIME_SIMPLE)")
+    print(_linea_separadora())
+    print(f"  Valor actual: {config.PASOS_POR_FASE_ARA}")
+    print()
+
+    for i, pasos in enumerate(TECLAS_PASOS_FASE.values(), start=1):
+        print(f"  {i}) pasos por fase = {pasos}")
+    print()
+
+    print("Pulsa 1, 2 o 3 en la ventana 3D de Webots.")
+    print(_linea_separadora())
+
+
+def elegir_algoritmo():
+    teclado = supervisor.getKeyboard()
+    teclado.enable(TIEMPO_PASO)
+
+    _imprimir_menu_algoritmos()
+    sys.stdout.flush()
+
+    elegido = _esperar_tecla(teclado, TECLAS_ALGORITMO)
+    return elegido or config.ALGORITMO
+
+
+def elegir_heuristica(algoritmo):
+    if algoritmo == "dijkstra":
+        return "nula"
+
+    teclado = supervisor.getKeyboard()
+    teclado.enable(TIEMPO_PASO)
+
+    _imprimir_menu_heuristica(algoritmo)
+    sys.stdout.flush()
+
+    elegida = _esperar_tecla(teclado, TECLAS_HEURISTICA)
+    return elegida or config.HEURISTICA
+
+
+def elegir_coste_zona():
+    teclado = supervisor.getKeyboard()
+    teclado.enable(TIEMPO_PASO)
+
+    _imprimir_menu_coste_zona()
+    sys.stdout.flush()
+
+    coste = _esperar_tecla(teclado, TECLAS_COSTE_ZONA)
+    if coste is not None:
+        config.aplicar_coste_zona_especifica(coste)
+    return config.COSTE_ZONA_ESPECIFICA
+
+
 def elegir_modo_ara():
     teclado = supervisor.getKeyboard()
     teclado.enable(TIEMPO_PASO)
 
     _imprimir_menu_modo_ara()
     sys.stdout.flush()
-    _esperar_liberacion_teclas(teclado)
 
-    while supervisor.step(TIEMPO_PASO) != -1:
-        tecla = teclado.getKey()
-
-        if tecla in TECLAS_MODO_ARA:
-            elegido = TECLAS_MODO_ARA[tecla]
-            config.MODO_ARA = elegido
-            _esperar_liberacion_teclas(teclado)
-            return elegido
-
+    elegido = _esperar_tecla(teclado, TECLAS_MODO_ARA)
+    if elegido is not None:
+        config.MODO_ARA = elegido
     return config.MODO_ARA
+
+
+def elegir_pasos_por_fase():
+    teclado = supervisor.getKeyboard()
+    teclado.enable(TIEMPO_PASO)
+
+    _imprimir_menu_pasos_fase()
+    sys.stdout.flush()
+
+    pasos = _esperar_tecla(teclado, TECLAS_PASOS_FASE)
+    if pasos is not None:
+        config.PASOS_POR_FASE_ARA = pasos
+    return config.PASOS_POR_FASE_ARA
 
 
 def elegir_configuracion():
     algoritmo = elegir_algoritmo()
     heuristica = elegir_heuristica(algoritmo)
+    elegir_coste_zona()
 
     config.ALGORITMO = algoritmo
     config.HEURISTICA = heuristica
 
     if algoritmo == "ara_star":
         elegir_modo_ara()
+        if config.MODO_ARA == "anytime_simple":
+            elegir_pasos_por_fase()
 
-    print()
-    print("Algoritmo  :", INFO_ALGORITMOS.get(algoritmo, {"nombre": algoritmo})["nombre"])
-    print("Heuristica :", INFO_HEURISTICAS.get(heuristica, {"nombre": heuristica})["nombre"])
-    if algoritmo == "ara_star":
-        print("Modo ARA*  :", INFO_MODO_ARA.get(config.MODO_ARA, {"nombre": config.MODO_ARA})["nombre"])
-    print("Modo       :", etiqueta_modo_busqueda(algoritmo, heuristica))
-    print()
+    config.imprimir_configuracion_planificacion()
     sys.stdout.flush()
     return algoritmo, heuristica

@@ -41,8 +41,11 @@ PASOS_POR_FASE_ARA = 10
 # Peso fijo del A* ponderado en comparativas: f(n) = g(n) + epsilon * h(n)
 PESO_ASTAR_PONDERADO = 1.5
 
-# Coste g de la zona azul (COST_ZONE_* en el .wbt). Cambiar solo aqui.
-COSTE_ZONA_AZUL = 1.2
+# Coste g de la zona especifica (geometria COST_ZONE_* en el .wbt). Cambiar solo aqui.
+COSTE_ZONA_ESPECIFICA = 2
+
+# Alias interno (misma variable)
+COSTE_ZONA_AZUL = COSTE_ZONA_ESPECIFICA
 
 # ============================================================================
 # MAPA — laberinto (worlds/pioneer3at.wbt)
@@ -211,13 +214,25 @@ for row in range(FILAS_MAPA):
 
 GRID = aplicar_margen_contorno(_GRID_BASE)
 
-# Zonas de coste: geometria del .wbt; el coste g lo define COSTE_ZONA_AZUL arriba.
+# Zonas de coste: geometria del .wbt; el coste g lo define COSTE_ZONA_ESPECIFICA arriba.
 ZONAS_COSTE = mapa.get("cost_zones", [])
 
+CELDAS_ZONA_ESPECIFICA = []
 for _zona in ZONAS_COSTE:
     for _row, _col in _zona.get("grid", {}).get("cells", []):
         if GRID[_row][_col] == 0:
-            GRID[_row][_col] = COSTE_ZONA_AZUL
+            CELDAS_ZONA_ESPECIFICA.append((_row, _col))
+            GRID[_row][_col] = COSTE_ZONA_ESPECIFICA
+
+
+def aplicar_coste_zona_especifica(coste=None):
+    """Actualiza COSTE_ZONA_ESPECIFICA y lo escribe en las celdas de la zona."""
+    global COSTE_ZONA_ESPECIFICA, COSTE_ZONA_AZUL
+    if coste is not None:
+        COSTE_ZONA_ESPECIFICA = float(coste)
+        COSTE_ZONA_AZUL = COSTE_ZONA_ESPECIFICA
+    for _row, _col in CELDAS_ZONA_ESPECIFICA:
+        GRID[_row][_col] = COSTE_ZONA_ESPECIFICA
 
 if ZONAS_COSTE:
     _g0 = ZONAS_COSTE[0].get("grid", {})
@@ -259,3 +274,40 @@ for objetivo_mundo, celda_objetivo in zip(OBJETIVOS_MUNDO, CELDAS_OBJETIVO):
             f"Objetivo no válido con margen {MARGEN_SEGURIDAD} m: {objetivo_mundo} -> {celda_objetivo} "
             f"(distancia al muro más cercano: {d:.2f} m)"
         )
+
+
+# ============================================================================
+# RESUMEN DE CONFIGURACION (consola / mapa)
+# ============================================================================
+
+_ETIQUETAS_ALGORITMO = {
+    "dijkstra": "Dijkstra",
+    "astar": "A*",
+    "greedy": "Greedy",
+    "ara_star": "ARA*",
+}
+
+_ETIQUETAS_HEURISTICA = {
+    "nula": "Nula",
+    "manhattan": "Manhattan",
+    "euclidiana": "Euclídea",
+    "octil": "Octil",
+}
+
+
+def imprimir_configuracion_planificacion():
+    """Confirma en consola los parametros activos de planificacion."""
+    print()
+    print("=" * 45)
+    print("CONFIGURACION DE PLANIFICACION")
+    print("=" * 45)
+    print("Algoritmo:", _ETIQUETAS_ALGORITMO.get(ALGORITMO, ALGORITMO))
+    if ALGORITMO != "dijkstra":
+        print("Heuristica:", _ETIQUETAS_HEURISTICA.get(HEURISTICA, HEURISTICA))
+    print("Coste zona especifica:", COSTE_ZONA_ESPECIFICA)
+    if ALGORITMO == "ara_star":
+        print("Modo ARA:", MODO_ARA)
+        if MODO_ARA == "anytime_simple":
+            print("Pasos por fase:", PASOS_POR_FASE_ARA)
+    print("=" * 45)
+    print()

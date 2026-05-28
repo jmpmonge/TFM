@@ -42,9 +42,11 @@ from configuracion.config import (
     ALGORITMO,
     HEURISTICA,
     MODO_ARA,
-    COSTE_ZONA_AZUL,
+    PASOS_POR_FASE_ARA,
+    COSTE_ZONA_ESPECIFICA,
     ZONAS_COSTE,
     _GRID_BASE,
+    imprimir_configuracion_planificacion,
 )
 
 COLOR_LIBRE = (1.0, 1.0, 1.0)
@@ -153,7 +155,7 @@ def dibujar_zonas_coste(ax):
 
 
 def _leyenda_zonas_coste():
-    """Coste de la zona azul: lee COSTE_ZONA_AZUL de config.py."""
+    """Coste de la zona especifica: lee COSTE_ZONA_ESPECIFICA de config.py."""
     if not ZONAS_COSTE:
         return []
 
@@ -162,7 +164,7 @@ def _leyenda_zonas_coste():
             facecolor=COLOR_ZONA_COSTE,
             edgecolor=COLOR_ZONA_COSTE,
             alpha=0.55,
-            label=f"Zona de coste (azul): coste = {COSTE_ZONA_AZUL:g}",
+            label=f"Zona de coste: coste = {COSTE_ZONA_ESPECIFICA:g}",
         )
     ]
 
@@ -199,6 +201,7 @@ def construir_camino_mision():
 
 def main():
     color_ruta, etiqueta_ruta = _estilo_ruta_mapa()
+    imprimir_configuracion_planificacion()
     camino, nodos = construir_camino_mision()
     coste_g = coste_camino(camino)
 
@@ -283,9 +286,11 @@ def main():
 
     if ALGORITMO == "ara_star":
         if MODO_ARA == "anytime_simple":
-            modo += " | ruta ejecutada (anytime)"
+            modo += f" | anytime ({PASOS_POR_FASE_ARA} pasos/fase)"
         else:
-            modo += " | ruta final (offline)"
+            modo += " | offline"
+
+    modo += f" | coste zona={COSTE_ZONA_ESPECIFICA:g}"
 
     ax.set_title(
         f"Mapa {FILAS_MAPA}x{COLUMNAS_MAPA} | {modo} | "
