@@ -21,11 +21,29 @@ TECLAS_HEURISTICA_ASTAR = {
     49: "nula",       # 1
     50: "manhattan",  # 2
     51: "euclidiana", # 3
+    52: "octil",      # 4
 }
 
 TECLAS_HEURISTICA_GREEDY = {
     49: "manhattan",  # 1
     50: "euclidiana", # 2
+    51: "octil",      # 3
+}
+
+TECLAS_MODO_ARA = {
+    49: "offline",         # 1
+    50: "anytime_simple",  # 2
+}
+
+INFO_MODO_ARA = {
+    "offline": {
+        "nombre": "ARA* offline",
+        "texto": "Calcula todas las rutas (epsilon decreciente) y luego mueve.",
+    },
+    "anytime_simple": {
+        "nombre": "ARA* anytime simple",
+        "texto": "Avanza por fases y puede cambiar de trayectoria al mejorar epsilon.",
+    },
 }
 
 INFO_ALGORITMOS = {
@@ -60,18 +78,14 @@ INFO_HEURISTICAS = {
         "nombre": "Euclidiana",
         "texto": "Distancia en línea recta.",
     },
+    "octil": {
+        "nombre": "Octil",
+        "texto": "Distancia con diagonales a coste sqrt(2).",
+    },
 }
 
 ORDEN_MENU_ALGORITMOS = ["dijkstra", "astar", "greedy", "ara_star"]
 
-
-def _icono_heuristica(clave):
-    """Solo Manhattan y Euclidiana llevan icono en consola."""
-    if clave == "manhattan":
-        return "📐 "
-    if clave == "euclidiana":
-        return "📏 "
-    return ""
 
 
 def _linea_separadora():
@@ -85,14 +99,22 @@ def etiqueta_modo_busqueda(algoritmo, heuristica=None):
     if algoritmo == "dijkstra":
         return nombre_alg
 
-    icono = _icono_heuristica(heuristica or "")
     info_h = INFO_HEURISTICAS.get(heuristica or "", {"nombre": heuristica})
-    return f"{nombre_alg} + {icono}{info_h.get('nombre', heuristica)}"
+    return f"{nombre_alg} + {info_h.get('nombre', heuristica)}"
+
+
+def _vaciar_teclado(teclado, pasos=12):
+    """Descarta pulsaciones en cola (p. ej. el '3' de greedy antes del submenú)."""
+    for _ in range(pasos):
+        if supervisor.step(TIEMPO_PASO) == -1:
+            return
+        teclado.getKey()
 
 
 def _esperar_liberacion_teclas(teclado):
     while supervisor.step(TIEMPO_PASO) != -1:
         if teclado.getKey() == -1:
+            _vaciar_teclado(teclado, pasos=4)
             return
 
 
@@ -113,8 +135,7 @@ def _imprimir_menu_algoritmos():
 
 
 def _imprimir_menu_heuristica(algoritmo):
-    es_ara = algoritmo == "ara_star"
-    titulo = "ARA*" if es_ara else "A*"
+    titulo = INFO_ALGORITMOS.get(algoritmo, {"nombre": algoritmo})["nombre"]
 
     print()
     print(_linea_separadora())
@@ -123,21 +144,21 @@ def _imprimir_menu_heuristica(algoritmo):
     print("La heuristica estima cuanto falta hasta el objetivo.")
     print()
 
-    if es_ara:
+    if algoritmo == "ara_star":
         print("ARA* repite la busqueda reduciendo epsilon en cada paso.")
         print(f"  epsilon inicio: {config.EPSILON_INICIAL_ARA}")
         print(f"  epsilon final : {config.EPSILON_FINAL_ARA}")
+        print(f"  modo actual   : {config.MODO_ARA}")
         print()
 
     if algoritmo == "greedy":
-        opciones = ["manhattan", "euclidiana"]
+        opciones = ["manhattan", "euclidiana", "octil"]
     else:
-        opciones = ["nula", "manhattan", "euclidiana"]
+        opciones = ["nula", "manhattan", "euclidiana", "octil"]
 
     for i, clave in enumerate(opciones, start=1):
         info = INFO_HEURISTICAS[clave]
-        icono = _icono_heuristica(clave)
-        print(f"  {i}) {icono}{info['nombre']}")
+        print(f"  {i}) {info['nombre']}")
         print(f"     {info['texto']}")
         print()
 
@@ -159,10 +180,6 @@ def elegir_algoritmo():
 
         if tecla in TECLAS_ALGORITMO:
             elegido = TECLAS_ALGORITMO[tecla]
-
-            while teclado.getKey() != -1:
-                pass
-
             _esperar_liberacion_teclas(teclado)
             return elegido
 
@@ -194,14 +211,46 @@ def elegir_heuristica(algoritmo):
 
         if tecla in teclas_heuristica:
             elegida = teclas_heuristica[tecla]
-
-            while teclado.getKey() != -1:
-                pass
-
             _esperar_liberacion_teclas(teclado)
             return elegida
 
     return config.HEURISTICA
+
+
+def _imprimir_menu_modo_ara():
+    print()
+    print(_linea_separadora())
+    print("ELIGE EL MODO ARA*")
+    print(_linea_separadora())
+
+    for i, clave in enumerate(("offline", "anytime_simple"), start=1):
+        info = INFO_MODO_ARA[clave]
+        print(f"  {i}) {info['nombre']}")
+        print(f"     {info['texto']}")
+        print()
+
+    print("Pulsa 1 u 2 en la ventana 3D de Webots.")
+    print(_linea_separadora())
+
+
+def elegir_modo_ara():
+    teclado = supervisor.getKeyboard()
+    teclado.enable(TIEMPO_PASO)
+
+    _imprimir_menu_modo_ara()
+    sys.stdout.flush()
+    _esperar_liberacion_teclas(teclado)
+
+    while supervisor.step(TIEMPO_PASO) != -1:
+        tecla = teclado.getKey()
+
+        if tecla in TECLAS_MODO_ARA:
+            elegido = TECLAS_MODO_ARA[tecla]
+            config.MODO_ARA = elegido
+            _esperar_liberacion_teclas(teclado)
+            return elegido
+
+    return config.MODO_ARA
 
 
 def elegir_configuracion():
@@ -211,8 +260,15 @@ def elegir_configuracion():
     config.ALGORITMO = algoritmo
     config.HEURISTICA = heuristica
 
+    if algoritmo == "ara_star":
+        elegir_modo_ara()
+
     print()
-    print("Modo elegido:", etiqueta_modo_busqueda(algoritmo, heuristica))
+    print("Algoritmo  :", INFO_ALGORITMOS.get(algoritmo, {"nombre": algoritmo})["nombre"])
+    print("Heuristica :", INFO_HEURISTICAS.get(heuristica, {"nombre": heuristica})["nombre"])
+    if algoritmo == "ara_star":
+        print("Modo ARA*  :", INFO_MODO_ARA.get(config.MODO_ARA, {"nombre": config.MODO_ARA})["nombre"])
+    print("Modo       :", etiqueta_modo_busqueda(algoritmo, heuristica))
     print()
     sys.stdout.flush()
     return algoritmo, heuristica

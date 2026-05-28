@@ -197,6 +197,7 @@ if __name__ == "__main__":
         ("Nula", "nula"),
         ("Manhattan", "manhattan"),
         ("Euclidiana", "euclidiana"),
+        ("Octil", "octil"),
     ]
 
     pruebas = []

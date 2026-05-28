@@ -19,11 +19,11 @@ RUEDAS = 0.0975 # Radio de las ruedas en m
 DISTANCIA_EJES = 0.325 # Distancia entre las ruedas en m
 
 # Algoritmo de planificacion activo.
-ALGORITMO = "astar"
+ALGORITMO = "ara_star" # "ara_star" | "astar" | "greedy" | "dijkstra"
 
 # Heurística que usa A* para estimar lo que falta hasta el goal.
-# Opciones: "manhattan" | "euclidiana" | "cero" (Dijkstra) | "agresiva" (greedy)
-HEURISTICA = "manhattan"
+# Opciones: "manhattan" | "euclidiana" | "octil" | "cero" (Dijkstra) | "agresiva" (greedy)
+HEURISTICA = "octil" # "manhattan" | "euclidiana" | "octil"
 
 # Parámetros de ARA* (ε = peso de la heurística en cada iteración)
 # ε alto  → ruta más rápida de calcular
@@ -32,38 +32,32 @@ EPSILON_INICIAL_ARA = 2.5
 EPSILON_FINAL_ARA = 1.0
 EPSILON_PASO_ARA = 0.5
 
+# Modo ARA*: "offline" (planifica todo y luego mueve) | "anytime_simple" (simulacion por fases)
+MODO_ARA = "offline"
+
+# Pasos simulados por fase en modo anytime_simple (celdas avanzadas entre recalculos)
+PASOS_POR_FASE_ARA = 10
+
 # Peso fijo del A* ponderado en comparativas: f(n) = g(n) + epsilon * h(n)
 PESO_ASTAR_PONDERADO = 1.5
 
+# Coste g de la zona azul (COST_ZONE_* en el .wbt). Cambiar solo aqui.
+COSTE_ZONA_AZUL = 1.2
+
 # ============================================================================
-# AJUSTES DEL MAPA
+# MAPA — laberinto (worlds/pioneer3at.wbt)
+# En cada arranque se lee el .wbt, se actualiza generated_map.json y se construye GRID.
 # ============================================================================
-# Tamaño de cada celda en metros.
 
-# En terreno de 7x7 metros, cada celda es de 1 metro de lado.
-CELL_SIZE = 1
-
-# El robot es ~0.5 m y queremos que ocupe 3x3 celdas → 0.5 / 3 ≈ 0.17 m
-# CELL_SIZE = 0.17
-CENTRO_CELDA = CELL_SIZE / 2
-
-# para mapa 7x7
-OBSTACLE_RADIUS = 0.0 # Radio de los obstáculos en metros∫
-MARGEN_SEGURIDAD = 0.0
-# para mapa amplio
-# OBSTACLE_RADIUS = 0.4 # Radio de los obstáculos en metros∫
-# MARGEN_SEGURIDAD = 0.6 # Margen extra para no rozar columnas en metros
-
-# Valores por defecto si el JSON no trae start/goals (mapa ARA* 7×7 clásico).
-INICIO_MUNDO_POR_DEFECTO = (3.0, -3.0)
+# Valores por defecto si el JSON no trae start/goals.
+INICIO_MUNDO_POR_DEFECTO = (-4.25, 10.25)
 OBJETIVOS_MUNDO_POR_DEFECTO = [
-    (-3.0, 3.0),
+    (-4.25, 7.25),
 ]
 BATERIA_MAX = 800 # NÚMERO DE UNIDADES DE BATERÍA, 1 UNIDAD = PASO DE 32ms
 
 # ============================================================================
-# SINCRONIZAR Y LEER MAPA DESDE JSON
-# Si pioneer3at.wbt cambió, se regenera generated_map.json al importar config.
+# CARGAR MAPA DESDE WBT (siempre al importar config / arrancar controlador)
 # ============================================================================
 import sys
 
@@ -71,19 +65,27 @@ _CONTROLLER_DIR = _AQUI.parent
 if str(_CONTROLLER_DIR) not in sys.path:
     sys.path.insert(0, str(_CONTROLLER_DIR))
 
-from herramientas.extract_wbt_to_json import sincronizar_si_necesario
-
+_ROOT_DIR = _CONTROLLER_DIR.parent.parent
+_WBT_MAPA = _ROOT_DIR / "worlds" / "pioneer3at.wbt"
 _JSON_MAPA = _AQUI / "generated_map.json"
-if sincronizar_si_necesario(verbose=False):
-    print("[config] Mapa actualizado desde worlds/pioneer3at.wbt")
 
-with open(_JSON_MAPA, "r", encoding="utf-8") as f:
-    mapa = json.load(f)
+from herramientas.extract_wbt_to_json import cargar_mapa_desde_wbt
 
-X_LIMITS = mapa["x_limits"]          # por ejemplo [-30.0, 30.0]
-Y_LIMITS = mapa["y_limits"]          # por ejemplo [-30.0, 30.0]
-RADIO_OBSTACULO = mapa["obstacle_radius"] # Radio de los obstáculos en metros
-OBSTACULOS = mapa["obstacles"]        # diccionario de {"name": ..., "x": ..., "y": ...}
+mapa = cargar_mapa_desde_wbt(
+    wbt_path=str(_WBT_MAPA),
+    json_path=str(_JSON_MAPA),
+    verbose=False,
+)
+
+CELL_SIZE = mapa.get("cell_size", 1.0)
+CENTRO_CELDA = CELL_SIZE / 2
+
+MARGEN_SEGURIDAD = 0.3
+
+X_LIMITS = mapa["x_limits"]
+Y_LIMITS = mapa["y_limits"]
+RADIO_OBSTACULO = mapa["obstacle_radius"]
+OBSTACULOS = mapa["obstacles"]
 GOALS = mapa.get("goals", [])
 START = mapa.get("start")
 
@@ -102,11 +104,15 @@ OBJETIVO_MUNDO = OBJETIVOS_MUNDO[0] # Compatibilidad con código que aún usa un
 ORIGEN_MAPA_X = X_LIMITS[0] # Coordenada X del origen del mapa
 ORIGEN_MAPA_Y = Y_LIMITS[0] # Coordenada Y del origen del mapa
 
-ANCHO_MAPA = X_LIMITS[1] - X_LIMITS[0] # Ancho del mapa en metros
-ALTO_MAPA = Y_LIMITS[1] - Y_LIMITS[0] # Alto del mapa en metros
+ANCHO_MAPA = X_LIMITS[1] - X_LIMITS[0]
+ALTO_MAPA = Y_LIMITS[1] - Y_LIMITS[0]
 
-COLUMNAS_MAPA = int(ANCHO_MAPA / CELL_SIZE) # Número de columnas del mapa
-FILAS_MAPA = int(ALTO_MAPA / CELL_SIZE) # Número de filas del mapa
+if "grid_cols" in mapa and "grid_rows" in mapa:
+    COLUMNAS_MAPA = mapa["grid_cols"]
+    FILAS_MAPA = mapa["grid_rows"]
+else:
+    COLUMNAS_MAPA = int(ANCHO_MAPA / CELL_SIZE)
+    FILAS_MAPA = int(ALTO_MAPA / CELL_SIZE)
 
 
 # ============================================================================
@@ -132,53 +138,95 @@ def centro_celda(row, col):
     return x, y
 
 
+def celda_ocupada(row, col, obs):
+    """True si el centro de la celda cae dentro del obstáculo (sin margen)."""
+    cx, cy = centro_celda(row, col)
+    h = CELL_SIZE / 2.0
+
+    if obs.get("type") == "box":
+        ox0 = obs["x"] - obs["size_x"] / 2.0
+        ox1 = obs["x"] + obs["size_x"] / 2.0
+        oy0 = obs["y"] - obs["size_y"] / 2.0
+        oy1 = obs["y"] + obs["size_y"] / 2.0
+        return cx - h < ox1 and cx + h > ox0 and cy - h < oy1 and cy + h > oy0
+
+    radio = obs.get("radius", RADIO_OBSTACULO)
+    dx = cx - obs["x"]
+    dy = cy - obs["y"]
+    return math.sqrt(dx * dx + dy * dy) <= radio + h
+
+
+def distancia_a_obstaculo(x, y, obs):
+    """Distancia euclídea del punto (x, y) al contorno del obstáculo."""
+    if obs.get("type") == "box":
+        dx = max(0.0, abs(x - obs["x"]) - obs["size_x"] / 2.0)
+        dy = max(0.0, abs(y - obs["y"]) - obs["size_y"] / 2.0)
+        return math.hypot(dx, dy)
+
+    radio = obs.get("radius", RADIO_OBSTACULO)
+    return max(0.0, math.hypot(x - obs["x"], y - obs["y"]) - radio)
+
+
+def distancia_al_contorno(x, y):
+    """Distancia mínima al contorno de cualquier obstáculo del mapa."""
+    if not OBSTACULOS:
+        return float("inf")
+    return min(distancia_a_obstaculo(x, y, obs) for obs in OBSTACULOS)
+
+
+def aplicar_margen_contorno(grid_base):
+    """
+    Expande el obstáculo solo hacia el espacio libre (contorno unificado).
+
+    A diferencia de inflar cada caja por separado, la distancia se mide al
+    contorno más cercano de todos los muros; las junturas interiores no suman
+    margen dos veces.
+    """
+    if MARGEN_SEGURIDAD <= 0.0:
+        return grid_base
+
+    grid = [fila[:] for fila in grid_base]
+    for row in range(FILAS_MAPA):
+        for col in range(COLUMNAS_MAPA):
+            if grid_base[row][col]:
+                continue
+            cx, cy = centro_celda(row, col)
+            if distancia_al_contorno(cx, cy) < MARGEN_SEGURIDAD:
+                grid[row][col] = 1
+    return grid
+
+
 # ============================================================================
-# CREAR REJILLA
+# CREAR REJILLA desde obstáculos del .wbt
 # 0 = celda libre, 1 = celda ocupada (muro del laberinto)
 # ============================================================================
-GRID = [[0 for _ in range(COLUMNAS_MAPA)] for _ in range(FILAS_MAPA)]
-
-# No se marca borde exterior: el mapa lógico es 7×7 y los muros vienen del JSON.
-# La arena Webots 8×8 es solo margen visual fuera de este grid.
+_GRID_BASE = [[0 for _ in range(COLUMNAS_MAPA)] for _ in range(FILAS_MAPA)]
 
 for row in range(FILAS_MAPA):
     for col in range(COLUMNAS_MAPA):
-        x, y = centro_celda(row, col)
-
         for obs in OBSTACULOS:
+            if celda_ocupada(row, col, obs):
+                _GRID_BASE[row][col] = 1
+                break
 
-            tipo = obs.get("type", "cylinder")
+GRID = aplicar_margen_contorno(_GRID_BASE)
 
-            # ------------------------------------------------------------
-            # CASO 1: MURO RECTANGULAR / BOX
-            # ------------------------------------------------------------
-            if tipo == "box":
-                margen = MARGEN_SEGURIDAD
+# Zonas de coste: geometria del .wbt; el coste g lo define COSTE_ZONA_AZUL arriba.
+ZONAS_COSTE = mapa.get("cost_zones", [])
 
-                mitad_x = obs["size_x"] / 2.0
-                mitad_y = obs["size_y"] / 2.0
+for _zona in ZONAS_COSTE:
+    for _row, _col in _zona.get("grid", {}).get("cells", []):
+        if GRID[_row][_col] == 0:
+            GRID[_row][_col] = COSTE_ZONA_AZUL
 
-                dentro_x = abs(x - obs["x"]) <= (mitad_x + margen)
-                dentro_y = abs(y - obs["y"]) <= (mitad_y + margen)
-
-                if dentro_x and dentro_y:
-                    GRID[row][col] = 1
-                    break
-
-            # ------------------------------------------------------------
-            # CASO 2: OBSTÁCULO CIRCULAR / CYLINDER
-            # ------------------------------------------------------------
-            else:
-                radio = obs.get("radius", RADIO_OBSTACULO)
-                radio_total = radio + MARGEN_SEGURIDAD
-
-                dx = x - obs["x"]
-                dy = y - obs["y"]
-                dist = math.sqrt(dx * dx + dy * dy)
-
-                if dist <= radio_total:
-                    GRID[row][col] = 1
-                    break
+if ZONAS_COSTE:
+    _g0 = ZONAS_COSTE[0].get("grid", {})
+    ZONA_COSTE_FILA_INI = _g0.get("row_ini")
+    ZONA_COSTE_FILA_FIN = (_g0.get("row_fin") + 1) if _g0.get("row_fin") is not None else None
+    ZONA_COSTE_COL_INI = _g0.get("col_ini")
+    ZONA_COSTE_COL_FIN = (_g0.get("col_fin") + 1) if _g0.get("col_fin") is not None else None
+else:
+    ZONA_COSTE_FILA_INI = ZONA_COSTE_FILA_FIN = ZONA_COSTE_COL_INI = ZONA_COSTE_COL_FIN = None
 
 # ============================================================================
 # COMPROBAR START Y GOAL
@@ -187,12 +235,27 @@ CELDA_INICIO = mundo_a_rejilla(INICIO_MUNDO[0], INICIO_MUNDO[1])
 CELDA_OBJETIVO = mundo_a_rejilla(OBJETIVO_MUNDO[0], OBJETIVO_MUNDO[1])
 CELDAS_OBJETIVO = [mundo_a_rejilla(x, y) for x, y in OBJETIVOS_MUNDO]
 
-if GRID[CELDA_INICIO[0]][CELDA_INICIO[1]] != 0:
-    raise ValueError(f"INICIO_MUNDO cae dentro de obstáculo: {INICIO_MUNDO} -> {CELDA_INICIO}")
+if GRID[CELDA_INICIO[0]][CELDA_INICIO[1]] == 1:
+    cx, cy = centro_celda(*CELDA_INICIO)
+    d = distancia_al_contorno(cx, cy)
+    raise ValueError(
+        f"INICIO_MUNDO no válido con margen {MARGEN_SEGURIDAD} m: {INICIO_MUNDO} -> {CELDA_INICIO} "
+        f"(distancia al muro más cercano: {d:.2f} m)"
+    )
 
-if GRID[CELDA_OBJETIVO[0]][CELDA_OBJETIVO[1]] != 0:
-    raise ValueError(f"OBJETIVO_MUNDO cae dentro de obstáculo: {OBJETIVO_MUNDO} -> {CELDA_OBJETIVO}")
+if GRID[CELDA_OBJETIVO[0]][CELDA_OBJETIVO[1]] == 1:
+    cx, cy = centro_celda(*CELDA_OBJETIVO)
+    d = distancia_al_contorno(cx, cy)
+    raise ValueError(
+        f"OBJETIVO_MUNDO no válido con margen {MARGEN_SEGURIDAD} m: {OBJETIVO_MUNDO} -> {CELDA_OBJETIVO} "
+        f"(distancia al muro más cercano: {d:.2f} m)"
+    )
 
 for objetivo_mundo, celda_objetivo in zip(OBJETIVOS_MUNDO, CELDAS_OBJETIVO):
-    if GRID[celda_objetivo[0]][celda_objetivo[1]] != 0:
-        raise ValueError(f"Objetivo cae dentro de obstáculo: {objetivo_mundo} -> {celda_objetivo}")
+    if GRID[celda_objetivo[0]][celda_objetivo[1]] == 1:
+        cx, cy = centro_celda(*celda_objetivo)
+        d = distancia_al_contorno(cx, cy)
+        raise ValueError(
+            f"Objetivo no válido con margen {MARGEN_SEGURIDAD} m: {objetivo_mundo} -> {celda_objetivo} "
+            f"(distancia al muro más cercano: {d:.2f} m)"
+        )

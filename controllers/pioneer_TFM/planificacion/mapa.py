@@ -1,12 +1,4 @@
-from configuracion.config import (
-    CELL_SIZE,
-    CENTRO_CELDA,
-    GRID,
-    ORIGEN_MAPA_X,
-    ORIGEN_MAPA_Y,
-    COLUMNAS_MAPA,
-    FILAS_MAPA,
-)
+from configuracion import config
 
 # ============================================================================
 # FUNCIONES AUXILIARES MAPA / WEBOTS
@@ -22,13 +14,15 @@ def mundo_a_rejilla(x, y):
     - Por eso la conversión de y debe invertirse.
     """
 
-    col = int((x - ORIGEN_MAPA_X) / CELL_SIZE)
+    col = int((x - config.ORIGEN_MAPA_X) / config.CELL_SIZE)
 
     # y se invierte porque fila 0 es arriba
-    row = int(((ORIGEN_MAPA_Y + FILAS_MAPA * CELL_SIZE) - y) / CELL_SIZE)
+    row = int(
+        ((config.ORIGEN_MAPA_Y + config.FILAS_MAPA * config.CELL_SIZE) - y) / config.CELL_SIZE
+    )
 
-    col = max(0, min(COLUMNAS_MAPA - 1, col))
-    row = max(0, min(FILAS_MAPA - 1, row))
+    col = max(0, min(config.COLUMNAS_MAPA - 1, col))
+    row = max(0, min(config.FILAS_MAPA - 1, row))
 
     return row, col
 
@@ -41,10 +35,10 @@ def centro_celda(row, col):
     fila 6 -> parte inferior del mapa
     """
 
-    x = ORIGEN_MAPA_X + col * CELL_SIZE + CENTRO_CELDA
+    x = config.ORIGEN_MAPA_X + col * config.CELL_SIZE + config.CENTRO_CELDA
 
     # Invertimos y para que fila 0 sea arriba
-    y = ORIGEN_MAPA_Y + (FILAS_MAPA - 1 - row) * CELL_SIZE + CENTRO_CELDA
+    y = config.ORIGEN_MAPA_Y + (config.FILAS_MAPA - 1 - row) * config.CELL_SIZE + config.CENTRO_CELDA
 
     return x, y
 
@@ -63,10 +57,10 @@ def es_libre(fila, col):
     Devuelve True si la celda es transitable y False si es obstáculo o está fuera del mapa.
     """
 
-    if fila < 0 or fila >= FILAS_MAPA:
+    if fila < 0 or fila >= config.FILAS_MAPA:
         return False
 
-    if col < 0 or col >= COLUMNAS_MAPA:
+    if col < 0 or col >= config.COLUMNAS_MAPA:
         return False
 
-    return GRID[fila][col] == 0
+    return config.GRID[fila][col] != 1

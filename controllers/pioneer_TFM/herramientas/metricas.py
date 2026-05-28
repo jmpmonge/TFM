@@ -5,13 +5,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from planificacion.algoritmos import ara_star, astar, dijkstra, greedy
 from configuracion.config import CELDA_INICIO, CELDA_OBJETIVO
-from planificacion.heuristicas import h_manhattan, h_euclidiana, h_nula
+from planificacion.heuristicas import h_manhattan, h_euclidiana, h_octil, h_nula
 
 
 heuristicas = {
     "nula": h_nula,
     "manhattan": h_manhattan,
     "euclidiana": h_euclidiana,
+    "octil": h_octil,
 }
 
 

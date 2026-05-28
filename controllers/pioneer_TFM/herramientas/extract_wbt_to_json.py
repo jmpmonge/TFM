@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sys
 
 # ============================================================================
 # RUTAS
@@ -29,6 +30,7 @@ JSON_PATH = os.path.join(_CONTROLADOR_DIR, "configuracion", "generated_map.json"
 # ============================================================================
 
 DEFAULT_OBSTACLE_RADIUS = 0.4
+DEFAULT_COST_ZONE = 2.0
 
 # Tamaño de celda lógica (1 m). El número de celdas se infiere del comentario
 # "Mapa lógico NxN" del .wbt; si no aparece, se usa floorSize de la arena.
@@ -45,16 +47,8 @@ def leer_lineas(ruta):
         return f.readlines()
 
 
-def extraer_floor_size(lineas):
-    """
-    Busca el tamaño del suelo dentro de RectangleArena.
-
-    Ejemplo:
-    RectangleArena {
-      floorSize 60 60
-    }
-    """
-
+def _leer_par_valores(lineas, clave):
+    """Busca clave dentro del bloque RectangleArena y devuelve dos floats."""
     dentro_arena = False
 
     for linea in lineas:
@@ -64,7 +58,7 @@ def extraer_floor_size(lineas):
             dentro_arena = True
             continue
 
-        if dentro_arena and texto.startswith("floorSize"):
+        if dentro_arena and texto.startswith(clave):
             partes = texto.split()
             return float(partes[1]), float(partes[2])
 
@@ -72,6 +66,29 @@ def extraer_floor_size(lineas):
             break
 
     return None, None
+
+
+def extraer_floor_size(lineas):
+    """
+    Busca el tamaño del suelo dentro de RectangleArena.
+
+    Ejemplo:
+    RectangleArena {
+      floorSize 60 60
+    }
+    """
+    return _leer_par_valores(lineas, "floorSize")
+
+
+def extraer_floor_tile_size(lineas):
+    """
+    Busca floorTileSize dentro de RectangleArena.
+
+    Ejemplo:
+      floorTileSize 1 1
+      floorTileSize 0.17 0.17
+    """
+    return _leer_par_valores(lineas, "floorTileSize")
 
 
 def extraer_translation_cercana(lineas, indice_inicio, max_busqueda=20):
@@ -168,18 +185,16 @@ def extraer_cylinder_radius_cercano(lineas, indice_inicio, max_busqueda=80):
     return None
 
 
-def inferir_grid_celdas(lineas, floor_x):
+def inferir_grid_celdas(floor_x, floor_y, tile_x, tile_y):
     """
-    Lee "Mapa lógico NxN" del .wbt; si no hay comentario, usa floorSize.
+    Calcula columnas y filas lógicas a partir de la arena y el tamaño de baldosa.
     """
-    for linea in lineas:
-        coincidencia = re.search(r"Mapa lógico (\d+)x(\d+)", linea, re.IGNORECASE)
-        if coincidencia:
-            filas = int(coincidencia.group(1))
-            columnas = int(coincidencia.group(2))
-            if filas == columnas:
-                return filas
-    return int(floor_x)
+    if tile_x <= 0 or tile_y <= 0:
+        raise ValueError("floorTileSize debe ser mayor que cero.")
+
+    columnas = int(round(floor_x / tile_x))
+    filas = int(round(floor_y / tile_y))
+    return columnas, filas
 
 
 # ============================================================================
@@ -251,6 +266,101 @@ def extraer_obstaculos_y_muros(lineas):
             })
 
     return obstaculos
+
+
+# ============================================================================
+# EXTRAER ZONAS DE COSTE (superficies COST_ZONE_* del .wbt)
+# ============================================================================
+
+def _coste_desde_nombre_zona(nombre):
+    """COST_ZONE_5 → 5.0; COST_ZONE_SURFACE u otros → DEFAULT_COST_ZONE."""
+    coincidencia = re.match(r"^COST_ZONE_(\d+(?:\.\d+)?)$", nombre)
+    if coincidencia:
+        return float(coincidencia.group(1))
+    return DEFAULT_COST_ZONE
+
+
+def _centro_celda_json(row, col, origen_x, origen_y, filas, cell_size):
+    x = origen_x + col * cell_size + cell_size / 2.0
+    y = origen_y + (filas - 1 - row) * cell_size + cell_size / 2.0
+    return x, y
+
+
+def _celda_dentro_caja(row, col, caja, origen_x, origen_y, filas, cell_size):
+    cx, cy = _centro_celda_json(row, col, origen_x, origen_y, filas, cell_size)
+    h = cell_size / 2.0
+    ox0 = caja["x"] - caja["size_x"] / 2.0
+    ox1 = caja["x"] + caja["size_x"] / 2.0
+    oy0 = caja["y"] - caja["size_y"] / 2.0
+    oy1 = caja["y"] + caja["size_y"] / 2.0
+    return cx - h < ox1 and cx + h > ox0 and cy - h < oy1 and cy + h > oy0
+
+
+def zona_coste_a_rejilla(zona, origen_x, origen_y, filas, columnas, cell_size):
+    """Convierte la caja Webots de una zona de coste a celdas lógicas."""
+    celdas = []
+    for row in range(filas):
+        for col in range(columnas):
+            if _celda_dentro_caja(row, col, zona, origen_x, origen_y, filas, cell_size):
+                celdas.append([row, col])
+
+    if not celdas:
+        return {
+            "row_ini": None,
+            "row_fin": None,
+            "col_ini": None,
+            "col_fin": None,
+            "cells": [],
+        }
+
+    filas_c = [c[0] for c in celdas]
+    cols_c = [c[1] for c in celdas]
+    return {
+        "row_ini": min(filas_c),
+        "row_fin": max(filas_c),
+        "col_ini": min(cols_c),
+        "col_fin": max(cols_c),
+        "cells": celdas,
+    }
+
+
+def extraer_zonas_coste(lineas):
+    """
+    Extrae superficies DEF COST_ZONE_* (no son obstáculos ni muros).
+
+    El coste se lee del nombre: COST_ZONE_5 → 5; otro nombre → DEFAULT_COST_ZONE.
+    """
+    zonas = []
+
+    for i, linea in enumerate(lineas):
+        texto = linea.strip()
+
+        if not texto.startswith("DEF COST_ZONE_") or "Solid" not in texto:
+            continue
+
+        nombre = texto.split()[1]
+        pos = extraer_translation_cercana(lineas, i)
+        box_size = extraer_box_size_cercano(lineas, i)
+
+        if pos is None or box_size is None:
+            continue
+
+        x, y, z = pos
+        size_x, size_y, size_z = box_size
+
+        zonas.append({
+            "name": nombre,
+            "type": "box",
+            "cost": _coste_desde_nombre_zona(nombre),
+            "x": x,
+            "y": y,
+            "z": z,
+            "size_x": size_x,
+            "size_y": size_y,
+            "size_z": size_z,
+        })
+
+    return zonas
 
 
 # ============================================================================
@@ -331,8 +441,8 @@ def necesita_regenerar(wbt_path=WBT_PATH, json_path=JSON_PATH):
     return os.path.getmtime(wbt_path) > os.path.getmtime(json_path)
 
 
-def generar_mapa_json(wbt_path=WBT_PATH, json_path=JSON_PATH, verbose=False):
-    """Lee el .wbt y escribe generated_map.json. Devuelve el dict generado."""
+def generar_mapa_json(wbt_path=WBT_PATH, json_path=JSON_PATH, verbose=False, escribir_json=True):
+    """Lee el .wbt y devuelve el dict del mapa. Opcionalmente escribe generated_map.json."""
     lineas = leer_lineas(wbt_path)
 
     floor_x, floor_y = extraer_floor_size(lineas)
@@ -340,18 +450,32 @@ def generar_mapa_json(wbt_path=WBT_PATH, json_path=JSON_PATH, verbose=False):
     if floor_x is None or floor_y is None:
         raise ValueError("No se ha encontrado floorSize en RectangleArena.")
 
-    grid_celdas = inferir_grid_celdas(lineas, floor_x)
+    tile_x, tile_y = extraer_floor_tile_size(lineas)
+    if tile_x is None or tile_y is None:
+        tile_x = tile_y = LOGICAL_CELL_SIZE
+
+    cell_size = tile_x
+    grid_cols, grid_rows = inferir_grid_celdas(floor_x, floor_y, tile_x, tile_y)
     obstaculos = extraer_obstaculos_y_muros(lineas)
+    zonas_coste = extraer_zonas_coste(lineas)
     objetivos = extraer_objetivos(lineas)
     inicio = extraer_inicio(lineas)
 
-    medio = grid_celdas * LOGICAL_CELL_SIZE / 2.0
+    origen_x = -floor_x / 2.0
+    origen_y = -floor_y / 2.0
+
+    for zona in zonas_coste:
+        zona["grid"] = zona_coste_a_rejilla(
+            zona, origen_x, origen_y, grid_rows, grid_cols, cell_size
+        )
 
     datos = {
-        "x_limits": [-medio, medio],
-        "y_limits": [-medio, medio],
-        "grid_cells": grid_celdas,
-        "cell_size": LOGICAL_CELL_SIZE,
+        "x_limits": [origen_x, floor_x / 2.0],
+        "y_limits": [origen_y, floor_y / 2.0],
+        "grid_cols": grid_cols,
+        "grid_rows": grid_rows,
+        "grid_cells": max(grid_cols, grid_rows),
+        "cell_size": cell_size,
 
         # Se mantiene esta clave por compatibilidad.
         # Para cilindros antiguos se usa radius.
@@ -359,22 +483,34 @@ def generar_mapa_json(wbt_path=WBT_PATH, json_path=JSON_PATH, verbose=False):
         "obstacle_radius": DEFAULT_OBSTACLE_RADIUS,
 
         "obstacles": obstaculos,
+        "cost_zones": zonas_coste,
         "goals": objetivos,
     }
 
     if inicio is not None:
         datos["start"] = inicio
 
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(datos, f, indent=2, ensure_ascii=False)
+    if escribir_json:
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(datos, f, indent=2, ensure_ascii=False)
 
     if verbose:
         print("Hecho.")
-        print("JSON creado:", json_path)
+        if escribir_json:
+            print("JSON creado:", json_path)
         print("Arena Webots:", floor_x, "x", floor_y, "m")
-        print("Grid lógico:", grid_celdas, "x", grid_celdas,
-              "| límites", datos["x_limits"], datos["y_limits"])
+        print("Grid lógico:", grid_cols, "x", grid_rows,
+              "| cell_size", cell_size,
+              "| límites X", datos["x_limits"], "Y", datos["y_limits"])
         print("Obstáculos/muros:", len(obstaculos))
+        print("Zonas de coste:", len(zonas_coste))
+        for zona in zonas_coste:
+            g = zona.get("grid", {})
+            print(
+                f"  {zona['name']} cost={zona['cost']} "
+                f"filas {g.get('row_ini')}..{g.get('row_fin')} "
+                f"cols {g.get('col_ini')}..{g.get('col_fin')}"
+            )
         print("Objetivos:", len(objetivos))
         if inicio is not None:
             print("Inicio:", inicio)
@@ -396,6 +532,31 @@ def sincronizar_si_necesario(wbt_path=WBT_PATH, json_path=JSON_PATH, verbose=Fal
         return False
     generar_mapa_json(wbt_path, json_path, verbose=verbose)
     return True
+
+
+def resolver_wbt_activo(default_path=WBT_PATH):
+    """
+    Devuelve la ruta del .wbt que debe usarse para el mapa.
+
+    - En Webots: el mundo abierto (supervisor.getWorldPath()).
+    - Fuera de Webots (scripts, pruebas): default_path (pioneer3at.wbt).
+    """
+    mod = sys.modules.get("simulacion.robot_io")
+    if mod is not None and hasattr(mod, "supervisor"):
+        try:
+            path = mod.supervisor.getWorldPath()
+            if path and os.path.isfile(path):
+                return os.path.abspath(path)
+        except Exception:
+            pass
+    return os.path.abspath(default_path)
+
+
+def cargar_mapa_desde_wbt(wbt_path=None, json_path=JSON_PATH, verbose=False):
+    """Lee el .wbt activo y actualiza generated_map.json."""
+    if wbt_path is None:
+        wbt_path = resolver_wbt_activo()
+    return generar_mapa_json(wbt_path, json_path, verbose=verbose, escribir_json=True)
 
 
 # ============================================================================
