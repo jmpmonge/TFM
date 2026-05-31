@@ -72,8 +72,8 @@ COLOR_RUTA_INTERMEDIA = "darkorange"
 COLOR_RUTA_FINAL = "royalblue"
 COLOR_IDA_COMBINADO = "green"
 COLOR_VUELTA_COMBINADO = "royalblue"
-MARKER_SIZE_IDA = 6
-MARKER_SIZE_VUELTA = 11
+MARKER_SIZE_IDA = 3
+MARKER_SIZE_VUELTA = 7
 MARKER_EDGE_VUELTA = 1.5
 
 
@@ -666,12 +666,12 @@ def guardar_mapa(
 
     ax.text(
         CELDA_INICIO[1], CELDA_INICIO[0], "S",
-        ha="center", va="center", color="green", fontsize=20, fontweight="bold", zorder=10,
+        ha="center", va="center", color="green", fontsize=12, fontweight="bold", zorder=10,
     )
     for i, (fila, columna) in enumerate(CELDAS_OBJETIVO, start=1):
         ax.text(
             columna, fila, f"G{i}",
-            ha="center", va="center", color="red", fontsize=14, fontweight="bold", zorder=10,
+            ha="center", va="center", color="red", fontsize=7, fontweight="bold", zorder=10,
         )
 
     _dibujar_rutas_en_mapa(
