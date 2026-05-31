@@ -147,6 +147,31 @@ def _completar_hasta_objetivo(ruta_ejecutada, ruta_activa, posicion_actual, obje
     return ruta_ejecutada[-1] if ruta_ejecutada else posicion_actual
 
 
+def _coste_suelo_cambiante(coste_inicial, operacion, etiqueta_zona):
+    """
+    Calcula el nuevo coste de una zona al activar suelo cambiante.
+    Si la operacion falla o el resultado no es valido (> 0 y finito), usa 1.0.
+    """
+    try:
+        if operacion == "x5":
+            nuevo = coste_inicial * 5
+        elif operacion == "/5":
+            nuevo = coste_inicial / 5
+        else:
+            nuevo = coste_inicial
+        if not math.isfinite(nuevo) or nuevo <= 0:
+            raise ValueError(f"coste no valido: {nuevo!r}")
+        if operacion == "/5" and nuevo < 1:
+            raise ValueError(f"coste tras division menor que 1: {nuevo!r}")
+        return float(nuevo)
+    except (ZeroDivisionError, TypeError, ValueError):
+        print(
+            f"AVISO suelo cambiante: {etiqueta_zona} "
+            f"({coste_inicial!r} {operacion}) no valido; se usa coste 1.0"
+        )
+        return 1.0
+
+
 def actualizar_suelo_cambiante_si_toca(indice_fase):
     """
     Cambia una sola vez los costes del suelo después de la primera fase de ARA*.
@@ -157,6 +182,8 @@ def actualizar_suelo_cambiante_si_toca(indice_fase):
     - zona 1 se multiplica por 5
     - zona 2 se divide entre 5
     - zona 3 queda igual
+    - si alguna operacion falla o el resultado no es valido, se usa coste 1.0
+      (aviso en consola antes del bloque SUELO CAMBIANTE ACTIVADO)
     - se actualiza el GRID con config.aplicar_costes_zonas(...)
     """
     global _SUELO_CAMBIANTE_APLICADO
@@ -173,9 +200,9 @@ def actualizar_suelo_cambiante_si_toca(indice_fase):
     if _SUELO_CAMBIANTE_APLICADO:
         return False
 
-    nuevo_zona_1 = config.COSTE_ZONA_1 * 5
-    nuevo_zona_2 = config.COSTE_ZONA_2 / 5
-    nuevo_zona_3 = config.COSTE_ZONA_3
+    nuevo_zona_1 = _coste_suelo_cambiante(config.COSTE_ZONA_1, "x5", "COSTE_ZONA_1")
+    nuevo_zona_2 = _coste_suelo_cambiante(config.COSTE_ZONA_2, "/5", "COSTE_ZONA_2")
+    nuevo_zona_3 = _coste_suelo_cambiante(config.COSTE_ZONA_3, "=", "COSTE_ZONA_3")
 
     config.aplicar_costes_zonas(
         zona1=nuevo_zona_1,
@@ -357,48 +384,6 @@ ALGORITMOS_DISPONIBLES = {
 # NÚCLEO DE BÚSQUEDA
 # ==============================
 
-# ============================================================================
-# COSTES DEL TERRENO
-# ============================================================================
-
-# Factores ambientales por celda.
-# Formato:
-# (fila, columna): {
-#     "pendiente": valor,
-#     "traccion": valor,
-#     "energia": valor,
-# }
-#
-# De momento puede estar vacío para no alterar los resultados actuales.
-# Más adelante aquí se podrán añadir zonas concretas del mapa.
-FACTORES_TERRENO = {
-    # Ejemplo:
-    # (120, 140): {"pendiente": 2.0, "traccion": 1.5, "energia": 1.0},
-}
-
-def obtener_factores_terreno(celda):
-    """
-    Devuelve los factores ambientales asociados a una celda.
-
-    Si la celda no tiene datos específicos, se considera terreno normal:
-
-    - pendiente = 0
-    - traccion = 0
-    - energia = 0
-
-    Interpretación:
-    - pendiente alta aumenta el coste.
-    - tracción baja se codifica como penalización alta.
-    - energía representa consumo extra estimado.
-    """
-
-    factores_por_defecto = {
-        "pendiente": 0.0,
-        "traccion": 0.0,
-        "energia": 0.0,
-    }
-
-    return FACTORES_TERRENO.get(celda, factores_por_defecto)
 
 def coste_base_celda(celda):
     """Coste base del terreno: celda libre (0) → 1; valor > 0 → ese valor."""

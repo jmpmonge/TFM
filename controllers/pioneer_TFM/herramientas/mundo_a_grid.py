@@ -47,6 +47,7 @@ from configuracion.config import (
     PASOS_POR_FASE_ARA,
     ZONAS_COSTE,
     _GRID_BASE,
+    _GRID_TRANSITABLE,
     imprimir_configuracion_planificacion,
 )
 
@@ -72,8 +73,8 @@ COLOR_RUTA_INTERMEDIA = "darkorange"
 COLOR_RUTA_FINAL = "royalblue"
 COLOR_IDA_COMBINADO = "green"
 COLOR_VUELTA_COMBINADO = "royalblue"
-MARKER_SIZE_IDA = 6
-MARKER_SIZE_VUELTA = 11
+MARKER_SIZE_IDA = 4
+MARKER_SIZE_VUELTA = 8
 MARKER_EDGE_VUELTA = 1.5
 
 
@@ -206,7 +207,7 @@ def celda_libre(fila, columna):
     """True si la celda es transitable o esta fuera del mapa."""
     if fila < 0 or fila >= FILAS_MAPA or columna < 0 or columna >= COLUMNAS_MAPA:
         return True
-    return GRID[fila][columna] != 1
+    return _GRID_TRANSITABLE[fila][columna] != 1
 
 
 def dibujar_contorno_exterior(ax):
@@ -220,7 +221,7 @@ def dibujar_contorno_exterior(ax):
 
     for fila in range(FILAS_MAPA):
         for columna in range(COLUMNAS_MAPA):
-            if GRID[fila][columna] != 1:
+            if _GRID_TRANSITABLE[fila][columna] != 1:
                 continue
 
             x0, x1 = columna - 0.5, columna + 0.5

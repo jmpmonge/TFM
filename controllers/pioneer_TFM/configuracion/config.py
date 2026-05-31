@@ -221,6 +221,10 @@ for row in range(FILAS_MAPA):
 
 GRID = aplicar_margen_contorno(_GRID_BASE)
 
+# Muros + margen fijos (0/1). No se sobrescribe al pintar costes de zona en GRID.
+# es_libre() debe usar esto: un coste g=1 en GRID vale 1.0 y no debe confundirse con muro.
+_GRID_TRANSITABLE = [fila[:] for fila in GRID]
+
 # 3 zonas de coste: geometria en .wbt, coste g en COSTE_ZONA_1/2/3 arriba.
 ZONAS_COSTE = mapa.get("cost_zones", [])
 
@@ -266,7 +270,7 @@ CELDA_INICIO = mundo_a_rejilla(INICIO_MUNDO[0], INICIO_MUNDO[1])
 CELDA_OBJETIVO = mundo_a_rejilla(OBJETIVO_MUNDO[0], OBJETIVO_MUNDO[1])
 CELDAS_OBJETIVO = [mundo_a_rejilla(x, y) for x, y in OBJETIVOS_MUNDO]
 
-if GRID[CELDA_INICIO[0]][CELDA_INICIO[1]] == 1:
+if _GRID_TRANSITABLE[CELDA_INICIO[0]][CELDA_INICIO[1]] == 1:
     cx, cy = centro_celda(*CELDA_INICIO)
     d = distancia_al_contorno(cx, cy)
     raise ValueError(
@@ -274,7 +278,7 @@ if GRID[CELDA_INICIO[0]][CELDA_INICIO[1]] == 1:
         f"(distancia al muro más cercano: {d:.2f} m)"
     )
 
-if GRID[CELDA_OBJETIVO[0]][CELDA_OBJETIVO[1]] == 1:
+if _GRID_TRANSITABLE[CELDA_OBJETIVO[0]][CELDA_OBJETIVO[1]] == 1:
     cx, cy = centro_celda(*CELDA_OBJETIVO)
     d = distancia_al_contorno(cx, cy)
     raise ValueError(
@@ -283,7 +287,7 @@ if GRID[CELDA_OBJETIVO[0]][CELDA_OBJETIVO[1]] == 1:
     )
 
 for objetivo_mundo, celda_objetivo in zip(OBJETIVOS_MUNDO, CELDAS_OBJETIVO):
-    if GRID[celda_objetivo[0]][celda_objetivo[1]] == 1:
+    if _GRID_TRANSITABLE[celda_objetivo[0]][celda_objetivo[1]] == 1:
         cx, cy = centro_celda(*celda_objetivo)
         d = distancia_al_contorno(cx, cy)
         raise ValueError(
