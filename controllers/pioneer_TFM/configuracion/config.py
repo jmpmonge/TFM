@@ -2,6 +2,7 @@ import json
 import math
 import os
 import pathlib
+import re
 
 # Ruta del directorio donde vive este propio config.py. Usándola siempre como
 # base hacemos que los ficheros de datos (generated_map.json, etc.) se
@@ -29,6 +30,8 @@ INICIO_MUNDO_POR_DEFECTO = (-4.25, 10.25)
 OBJETIVOS_MUNDO_POR_DEFECTO = [
     (-4.25, 7.25),
 ]
+
+SUELO_CAMBIANTE = False
 
 
 # ============================================================================
@@ -221,17 +224,23 @@ GRID = aplicar_margen_contorno(_GRID_BASE)
 # 3 zonas de coste: geometria en .wbt, coste g en COSTE_ZONA_1/2/3 arriba.
 ZONAS_COSTE = mapa.get("cost_zones", [])
 
-_MAPA_COSTES_ZONA = {
-    "COST_ZONE_2": lambda: COSTE_ZONA_1,
-    "COST_ZONE_3": lambda: COSTE_ZONA_2,
-    "COST_ZONE_4": lambda: COSTE_ZONA_3,
-}
+_COSTES_POR_INDICE = (
+    None,
+    lambda: COSTE_ZONA_1,
+    lambda: COSTE_ZONA_2,
+    lambda: COSTE_ZONA_3,
+)
 
 
 def coste_de_zona(nombre):
-    """Devuelve el coste g configurado para COST_ZONE_2, _3 o _4."""
-    fn = _MAPA_COSTES_ZONA.get(nombre)
-    return fn() if fn else 1.0
+    """Devuelve el coste g configurado para COST_ZONE_1, _2 o _3."""
+    coincidencia = re.match(r"^COST_ZONE_(\d+)$", nombre)
+    if not coincidencia:
+        return 1.0
+    indice = int(coincidencia.group(1))
+    if 1 <= indice <= 3:
+        return _COSTES_POR_INDICE[indice]()
+    return 1.0
 
 
 CELDAS_POR_ZONA = {}
@@ -324,6 +333,7 @@ def imprimir_configuracion_planificacion():
     print("Coste zona 1 (azul)  :", COSTE_ZONA_1)
     print("Coste zona 2 (verde):", COSTE_ZONA_2)
     print("Coste zona 3 (amar.) :", COSTE_ZONA_3)
+    print("Suelo cambiante      :", SUELO_CAMBIANTE)
     if ALGORITMO == "ara_star":
         print("Modo ARA:", MODO_ARA)
         if MODO_ARA == "anytime_simple":

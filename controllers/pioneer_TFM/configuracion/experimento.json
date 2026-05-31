@@ -1,0 +1,22 @@
+{
+  "COSTE_ZONA_1": 4.0,
+  "COSTE_ZONA_2": 20.0,
+  "COSTE_ZONA_3": 5,
+  "PASOS_POR_FASE_ARA": 5,
+  "PESO_ASTAR_PONDERADO": 1.5,
+  "EPSILON_INICIAL_ARA": 5,
+  "EPSILON_FINAL_ARA": 1.0,
+  "EPSILON_PASO_ARA": 1,
+  "BATERIA_MAX": 800,
+  "INICIO_MUNDO_POR_DEFECTO": [
+    -4.5,
+    9.75
+  ],
+  "OBJETIVOS_MUNDO_POR_DEFECTO": [
+    [
+      -3.75,
+      7.15
+    ]
+  ],
+  "SUELO_CAMBIANTE": true
+}

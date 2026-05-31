@@ -4,11 +4,15 @@ import math
 # apunte al .wbt que Webots tiene realmente abierto.
 
 from simulacion import menu_heuristica
-menu_heuristica.elegir_configuracion()
 
 from configuracion import config
+from configuracion import config_menu
+
+config_menu.cargar_desde_archivo(config)
+menu_heuristica.elegir_configuracion()
 
 from planificacion.algoritmos import (
+    actualizar_suelo_cambiante_si_toca,
     coste_base_celda,
     coste_bateria_camino,
     coste_bateria_movimiento,
@@ -16,6 +20,7 @@ from planificacion.algoritmos import (
     planificar_mision,
     aplanar_mision,
     imprimir_resumen_planificacion,
+    reiniciar_suelo_cambiante,
 )
 from planificacion.mapa import celda_a_mundo
 from simulacion.robot_io import colocar_inicio, dibujar_bateria, fijar_velocidad_ruedas, leer_estado, paso
@@ -27,6 +32,11 @@ INDICE_OBJETIVO = 0
 NODOS_EXPLORADOS = 0
 
 objetivos_celda = [config.mundo_a_rejilla(x, y) for x, y in config.OBJETIVOS_MUNDO]
+_costes_suelo_iniciales = (
+    config.COSTE_ZONA_1,
+    config.COSTE_ZONA_2,
+    config.COSTE_ZONA_3,
+)
 rutas, NODOS_EXPLORADOS = planificar_mision(
     config.CELDA_INICIO,
     objetivos_celda,
@@ -34,6 +44,9 @@ rutas, NODOS_EXPLORADOS = planificar_mision(
     config.BATERIA_MAX,
     devolver_nodos=True,
 )
+
+if config.SUELO_CAMBIANTE:
+    reiniciar_suelo_cambiante(_costes_suelo_iniciales)
 
 CAMINO_CELDAS = aplanar_mision(rutas)
 PUNTOS = [celda_a_mundo(celda) for celda in CAMINO_CELDAS]
@@ -59,6 +72,8 @@ imprimir_resumen_planificacion(
     CAMINO_CELDAS,
     NODOS_EXPLORADOS,
 )
+
+config.imprimir_configuracion_planificacion()
 
 bateria_actual = config.BATERIA_MAX
 _celda_inicio = config.CELDA_INICIO
@@ -95,6 +110,10 @@ while paso():
     bateria_actual = max(0.0, config.BATERIA_MAX - consumo)
 
     celda_actual = config.mundo_a_rejilla(state["x"], state["y"])
+
+    if config.SUELO_CAMBIANTE and INDICE_OBJETIVO >= config.PASOS_POR_FASE_ARA:
+        actualizar_suelo_cambiante_si_toca(1)
+
     valor_grid = config.GRID[celda_actual[0]][celda_actual[1]]
     consumo_celda = coste_base_celda(celda_actual)
 

@@ -56,9 +56,9 @@ COLOR_MURO = (0.15, 0.15, 0.15)
 COLOR_ZONA_COSTE = (0.12, 0.45, 0.95)
 # Colores baseColor del .wbt (pioneer3at.wbt)
 COLORES_ZONA_MUNDO = {
-    "COST_ZONE_2": (0.12, 0.45, 0.95),  # azul
-    "COST_ZONE_3": (0.18, 0.72, 0.28),  # verde
-    "COST_ZONE_4": (0.95, 0.55, 0.12),  # amarillo
+    "COST_ZONE_1": (0.12, 0.45, 0.95),  # azul
+    "COST_ZONE_2": (0.18, 0.72, 0.28),  # verde
+    "COST_ZONE_3": (0.95, 0.55, 0.12),  # amarillo
 }
 
 
@@ -297,9 +297,9 @@ def _leyenda_zonas_coste():
         return []
 
     _etiquetas = {
-        "COST_ZONE_2": "Zona 1 azul (arriba)",
-        "COST_ZONE_3": "Zona 2 verde (izquierda)",
-        "COST_ZONE_4": "Zona 3 amarilla (centro)",
+        "COST_ZONE_1": "Zona 1 azul (arriba)",
+        "COST_ZONE_2": "Zona 2 verde (izquierda)",
+        "COST_ZONE_3": "Zona 3 amarilla (centro)",
     }
     entradas = []
     for zona in ZONAS_COSTE:

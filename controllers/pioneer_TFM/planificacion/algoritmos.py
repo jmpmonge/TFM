@@ -52,6 +52,8 @@ def astar_ponderado(inicio, objetivo, heuristica, peso_heuristica=None):
 # --------------------------------------------------------------------------
 ULTIMO_INFORME_ARA = None
 INFORME_ARA_MISION = []
+_SUELO_CAMBIANTE_APLICADO = False
+_OMITIR_SUELO_CAMBIANTE = False
 
 
 def _epsilons_ara(epsilons=None, eps_inicial=None, eps_final=None, eps_paso=None):
@@ -145,6 +147,68 @@ def _completar_hasta_objetivo(ruta_ejecutada, ruta_activa, posicion_actual, obje
     return ruta_ejecutada[-1] if ruta_ejecutada else posicion_actual
 
 
+def actualizar_suelo_cambiante_si_toca(indice_fase):
+    """
+    Cambia una sola vez los costes del suelo después de la primera fase de ARA*.
+
+    Si SUELO_CAMBIANTE es False, no hace nada.
+    Si indice_fase no es 1, no hace nada.
+    Si indice_fase es 1:
+    - zona 1 se multiplica por 5
+    - zona 2 se divide entre 5
+    - zona 3 queda igual
+    - se actualiza el GRID con config.aplicar_costes_zonas(...)
+    """
+    global _SUELO_CAMBIANTE_APLICADO
+
+    if _OMITIR_SUELO_CAMBIANTE:
+        return False
+
+    if not getattr(config, "SUELO_CAMBIANTE", False):
+        return False
+
+    if indice_fase != 1:
+        return False
+
+    if _SUELO_CAMBIANTE_APLICADO:
+        return False
+
+    nuevo_zona_1 = config.COSTE_ZONA_1 * 5
+    nuevo_zona_2 = config.COSTE_ZONA_2 / 5
+    nuevo_zona_3 = config.COSTE_ZONA_3
+
+    config.aplicar_costes_zonas(
+        zona1=nuevo_zona_1,
+        zona2=nuevo_zona_2,
+        zona3=nuevo_zona_3,
+    )
+
+    print()
+    print("=" * 45)
+    print("SUELO CAMBIANTE ACTIVADO")
+    print("=" * 45)
+    print("COSTE_ZONA_1 x5 =", config.COSTE_ZONA_1)
+    print("COSTE_ZONA_2 /5 =", config.COSTE_ZONA_2)
+    print("COSTE_ZONA_3    =", config.COSTE_ZONA_3)
+    print("=" * 45)
+    print()
+
+    _SUELO_CAMBIANTE_APLICADO = True
+    return True
+
+
+def reiniciar_suelo_cambiante(costes_iniciales):
+    """Restaura costes de zona y GRID al inicio de la simulacion en Webots."""
+    global _SUELO_CAMBIANTE_APLICADO
+
+    _SUELO_CAMBIANTE_APLICADO = False
+    config.aplicar_costes_zonas(
+        zona1=costes_iniciales[0],
+        zona2=costes_iniciales[1],
+        zona3=costes_iniciales[2],
+    )
+
+
 def planificar_ara_anytime_simple(inicio, objetivo, heuristica, epsilons=None,
                                   pasos_por_fase=None):
     """
@@ -166,6 +230,8 @@ def planificar_ara_anytime_simple(inicio, objetivo, heuristica, epsilons=None,
     nodos_totales = 0
 
     for i, epsilon in enumerate(epsilons):
+        suelo_actualizado = actualizar_suelo_cambiante_si_toca(i)
+
         nueva_ruta, nodos = astar_ponderado(
             posicion_actual,
             objetivo,
@@ -175,10 +241,15 @@ def planificar_ara_anytime_simple(inicio, objetivo, heuristica, epsilons=None,
         nodos_totales += nodos
         nuevo_coste = coste_camino(nueva_ruta) if nueva_ruta else float("inf")
 
-        if ruta_activa is None or nuevo_coste < coste_restante_actual:
+        if ruta_activa is None or suelo_actualizado or nuevo_coste < coste_restante_actual:
             ruta_activa = nueva_ruta
             coste_restante_actual = nuevo_coste
-            accion = "ruta inicial" if i == 0 else "ruta actualizada"
+            if i == 0:
+                accion = "ruta inicial"
+            elif suelo_actualizado:
+                accion = "ruta actualizada por cambio de suelo"
+            else:
+                accion = "ruta actualizada"
         else:
             accion = "se mantiene ruta anterior"
 
@@ -189,6 +260,12 @@ def planificar_ara_anytime_simple(inicio, objetivo, heuristica, epsilons=None,
             "coste": nuevo_coste,
             "nodos": nodos,
             "accion": accion,
+            "costes_suelo": (
+                config.COSTE_ZONA_1,
+                config.COSTE_ZONA_2,
+                config.COSTE_ZONA_3,
+            ),
+            "suelo_actualizado": suelo_actualizado,
         })
 
         if not ruta_activa:
@@ -546,6 +623,8 @@ def ordenar_objetivos(origen, objetivos):
 def filtrar_objetivos_por_bateria(origen, objetivos, base, bateria,
                                   algoritmo=None, heuristica=None):
     """Filtra objetivos según batería usando rutas planificadas y coste_bateria_camino."""
+    global _OMITIR_SUELO_CAMBIANTE
+
     funcion = _normalizar_algoritmo(algoritmo)
     h = _normalizar_heuristica(heuristica)
     objetivos_ordenados = ordenar_objetivos(origen, objetivos)
@@ -554,27 +633,31 @@ def filtrar_objetivos_por_bateria(origen, objetivos, base, bateria,
     coste_total = 0.0
     posicion_actual = origen
 
-    for obj in objetivos_ordenados:
-        camino_ida, _ = funcion(posicion_actual, obj, h)
-        if not camino_ida:
-            break
-        coste_hasta_obj = coste_bateria_camino(camino_ida)
+    _OMITIR_SUELO_CAMBIANTE = True
+    try:
+        for obj in objetivos_ordenados:
+            camino_ida, _ = funcion(posicion_actual, obj, h)
+            if not camino_ida:
+                break
+            coste_hasta_obj = coste_bateria_camino(camino_ida)
 
-        camino_vuelta, _ = funcion(obj, base, h)
-        coste_vuelta_base = coste_bateria_camino(camino_vuelta) if camino_vuelta else float("inf")
+            camino_vuelta, _ = funcion(obj, base, h)
+            coste_vuelta_base = coste_bateria_camino(camino_vuelta) if camino_vuelta else float("inf")
 
-        if coste_total + coste_hasta_obj + coste_vuelta_base > bateria:
-            if config.LOG_BATERIA_OBJETIVOS:
-                print(
-                    f"[BATERIA] objetivo {obj} descartado: "
-                    f"coste_mision={coste_total + coste_hasta_obj:.1f} + "
-                    f"vuelta={coste_vuelta_base:.1f} > {bateria}"
-                )
-            break
+            if coste_total + coste_hasta_obj + coste_vuelta_base > bateria:
+                if config.LOG_BATERIA_OBJETIVOS:
+                    print(
+                        f"[BATERIA] objetivo {obj} descartado: "
+                        f"coste_mision={coste_total + coste_hasta_obj:.1f} + "
+                        f"vuelta={coste_vuelta_base:.1f} > {bateria}"
+                    )
+                break
 
-        objetivos_validos.append(obj)
-        coste_total += coste_hasta_obj
-        posicion_actual = obj
+            objetivos_validos.append(obj)
+            coste_total += coste_hasta_obj
+            posicion_actual = obj
+    finally:
+        _OMITIR_SUELO_CAMBIANTE = False
 
     return objetivos_validos
 
@@ -605,7 +688,7 @@ def planificar_mision(origen, objetivos, base, bateria, devolver_nodos=False,
     comparativas (datos_comparados.py) se pueden inyectar manualmente vía
     `algoritmo=` y `heuristica=` (función o nombre str).
     """
-    global INFORME_ARA_MISION
+    global INFORME_ARA_MISION, _SUELO_CAMBIANTE_APLICADO
 
     funcion = _normalizar_algoritmo(algoritmo)
     h = _normalizar_heuristica(heuristica)
@@ -614,9 +697,25 @@ def planificar_mision(origen, objetivos, base, bateria, devolver_nodos=False,
         # Se vacia al inicio; preparar_ruta ira anadiendo un informe por tramo.
         INFORME_ARA_MISION = []
 
+    costes_iniciales = (
+        config.COSTE_ZONA_1,
+        config.COSTE_ZONA_2,
+        config.COSTE_ZONA_3,
+    )
+    _SUELO_CAMBIANTE_APLICADO = False
+
     objetivos_validos = filtrar_objetivos_por_bateria(
         origen, objetivos, base, bateria, algoritmo=funcion, heuristica=h
     )
+
+    # filtrar_objetivos_por_bateria puede activar suelo cambiante en ARA*;
+    # restaurar costes originales antes de la planificacion real de la mision.
+    config.aplicar_costes_zonas(
+        zona1=costes_iniciales[0],
+        zona2=costes_iniciales[1],
+        zona3=costes_iniciales[2],
+    )
+    _SUELO_CAMBIANTE_APLICADO = False
 
     rutas = []
     nodos_totales = 0

@@ -1,4 +1,7 @@
 import math
+
+from configuracion import config
+
 from controller import Supervisor  # type: ignore[import-not-found]
 
 
@@ -116,7 +119,12 @@ def dibujar_bateria(bateria_actual, bateria_max, valor_grid=0, consumo_celda=Non
     display.fillRectangle(0, 0, ancho_display, alto_display)
 
     display.setColor(color_texto)
-    display.drawText(f"Bateria: {int(bateria_actual)}/{int(bateria_max)}", margen, 0)
+    display.drawText(
+        f"B:{int(bateria_actual)}/{int(bateria_max)} Z:"
+        f"{int(config.COSTE_ZONA_1)}/{int(config.COSTE_ZONA_2)}/{int(config.COSTE_ZONA_3)}",
+        margen,
+        0,
+    )
 
     y_barra = 14
     if en_zona:
