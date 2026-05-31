@@ -28,38 +28,6 @@ TECLAS_MODO_ARA = {
     50: "anytime_simple",  # 2
 }
 
-# Opciones numericas: tecla A/B/C (no 1/2/3, para no confundir con otros menus).
-ZONAS_COSTE_MENU = (
-    ("Zona 1 azul - arriba (COST_ZONE_2)", "COSTE_ZONA_1"),
-    ("Zona 2 marron - izquierda (COST_ZONE_3)", "COSTE_ZONA_2"),
-    ("Zona 3 amarilla - centro (COST_ZONE_4)", "COSTE_ZONA_3"),
-)
-
-OPCIONES_COSTE_ZONA = (
-    ("A", 2),
-    ("B", 5),
-    ("C", 10),
-)
-
-OPCIONES_PASOS_FASE = (
-    ("A", 5),
-    ("B", 10),
-    ("C", 20),
-)
-
-
-def _teclas_opciones_abc(opciones):
-    """Mapea A/a, B/b, C/c al valor de cada opcion."""
-    teclas = {}
-    for letra, valor in opciones:
-        teclas[ord(letra.upper())] = valor
-        teclas[ord(letra.lower())] = valor
-    return teclas
-
-
-TECLAS_COSTE_ZONA = _teclas_opciones_abc(OPCIONES_COSTE_ZONA)
-TECLAS_PASOS_FASE = _teclas_opciones_abc(OPCIONES_PASOS_FASE)
-
 INFO_MODO_ARA = {
     "offline": {
         "nombre": "offline",
@@ -185,22 +153,6 @@ def _imprimir_menu_heuristica(algoritmo):
     print(_linea_separadora())
 
 
-def _imprimir_menu_coste_zona(titulo, valor_actual):
-    print()
-    print(_linea_separadora())
-    print(titulo)
-    print(_linea_separadora())
-    print(f"  Valor actual: {valor_actual}")
-    print()
-
-    for letra, coste in OPCIONES_COSTE_ZONA:
-        print(f"  {letra}) coste = {coste}")
-    print()
-
-    print("Pulsa A, B o C en la ventana 3D de Webots (no uses numeros).")
-    print(_linea_separadora())
-
-
 def _imprimir_menu_modo_ara():
     print()
     print(_linea_separadora())
@@ -214,22 +166,6 @@ def _imprimir_menu_modo_ara():
         print()
 
     print("Pulsa 1 (offline) o 2 (anytime_simple) en la ventana 3D de Webots.")
-    print(_linea_separadora())
-
-
-def _imprimir_menu_pasos_fase():
-    print()
-    print(_linea_separadora())
-    print("ELIGE LOS PASOS POR FASE (ANYTIME_SIMPLE)")
-    print(_linea_separadora())
-    print(f"  Valor actual: {config.PASOS_POR_FASE_ARA}")
-    print()
-
-    for letra, pasos in OPCIONES_PASOS_FASE:
-        print(f"  {letra}) pasos por fase = {pasos}")
-    print()
-
-    print("Pulsa A, B o C en la ventana 3D de Webots (no uses numeros).")
     print(_linea_separadora())
 
 
@@ -258,29 +194,6 @@ def elegir_heuristica(algoritmo):
     return elegida or config.HEURISTICA
 
 
-def elegir_costes_zonas():
-    teclado = supervisor.getKeyboard()
-    teclado.enable(TIEMPO_PASO)
-
-    valores = [
-        config.COSTE_ZONA_1,
-        config.COSTE_ZONA_2,
-        config.COSTE_ZONA_3,
-    ]
-
-    for i, (titulo, _attr) in enumerate(ZONAS_COSTE_MENU):
-        _imprimir_menu_coste_zona(titulo, valores[i])
-        sys.stdout.flush()
-        coste = _esperar_tecla(teclado, TECLAS_COSTE_ZONA)
-        if coste is not None:
-            valores[i] = coste
-            print(f"  -> {titulo}: coste = {coste}")
-            sys.stdout.flush()
-
-    config.aplicar_costes_zonas(*valores)
-    return valores
-
-
 def elegir_modo_ara():
     teclado = supervisor.getKeyboard()
     teclado.enable(TIEMPO_PASO)
@@ -294,33 +207,15 @@ def elegir_modo_ara():
     return config.MODO_ARA
 
 
-def elegir_pasos_por_fase():
-    teclado = supervisor.getKeyboard()
-    teclado.enable(TIEMPO_PASO)
-
-    _imprimir_menu_pasos_fase()
-    sys.stdout.flush()
-
-    pasos = _esperar_tecla(teclado, TECLAS_PASOS_FASE)
-    if pasos is not None:
-        config.PASOS_POR_FASE_ARA = pasos
-        print(f"  -> pasos por fase = {pasos}")
-        sys.stdout.flush()
-    return config.PASOS_POR_FASE_ARA
-
-
 def elegir_configuracion():
     algoritmo = elegir_algoritmo()
     heuristica = elegir_heuristica(algoritmo)
-    elegir_costes_zonas()
 
     config.ALGORITMO = algoritmo
     config.HEURISTICA = heuristica
 
     if algoritmo == "ara_star":
         elegir_modo_ara()
-        if config.MODO_ARA == "anytime_simple":
-            elegir_pasos_por_fase()
 
     config.imprimir_configuracion_planificacion()
     sys.stdout.flush()

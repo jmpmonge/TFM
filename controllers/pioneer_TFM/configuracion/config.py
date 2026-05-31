@@ -9,6 +9,29 @@ import pathlib
 _AQUI = pathlib.Path(__file__).parent
 
 # ============================================================================
+# VALORES EDITABLES
+# ============================================================================
+
+COSTE_ZONA_1 = 5
+COSTE_ZONA_2 = 5
+COSTE_ZONA_3 = 5
+
+PASOS_POR_FASE_ARA = 5
+PESO_ASTAR_PONDERADO = 1.5
+
+EPSILON_INICIAL_ARA = 5
+EPSILON_FINAL_ARA = 1.0
+EPSILON_PASO_ARA = 1
+
+BATERIA_MAX = 800
+
+INICIO_MUNDO_POR_DEFECTO = (-4.25, 10.25)
+OBJETIVOS_MUNDO_POR_DEFECTO = [
+    (-4.25, 7.25),
+]
+
+
+# ============================================================================
 # PARAMETROS GENERALES
 # ============================================================================
 
@@ -25,39 +48,14 @@ ALGORITMO = "ara_star" # "ara_star" | "astar" | "greedy" | "dijkstra"
 # Opciones: "manhattan" | "euclidiana" | "octil" | "cero" (Dijkstra) | "agresiva" (greedy)
 HEURISTICA = "octil" # "manhattan" | "euclidiana" | "octil"
 
-# Parámetros de ARA* (ε = peso de la heurística en cada iteración)
-# ε alto  → ruta más rápida de calcular
-# ε = 1.0 → mismo criterio que A* normal
-EPSILON_INICIAL_ARA = 3
-EPSILON_FINAL_ARA = 1.0
-EPSILON_PASO_ARA = 0.5
-
 # Modo ARA*: "offline" (planifica todo y luego mueve) | "anytime_simple" (simulacion por fases)
-MODO_ARA = "offline"
-
-# Pasos simulados por fase en modo anytime_simple (celdas avanzadas entre recalculos)
-PASOS_POR_FASE_ARA = 5
-
-# Peso fijo del A* ponderado en comparativas: f(n) = g(n) + epsilon * h(n)
-PESO_ASTAR_PONDERADO = 1.5
-
-# Coste g de cada zona (geometria en pioneer3at.wbt). Cambiar solo aqui.
-# Zona 1 = azul (COST_ZONE_2) | Zona 2 = marron (COST_ZONE_3) | Zona 3 = amarilla (COST_ZONE_4)
-COSTE_ZONA_1 = 20
-COSTE_ZONA_2 = 1
-COSTE_ZONA_3 = 30
+MODO_ARA = "anytime_simple"
 
 # ============================================================================
 # MAPA — laberinto (worlds/pioneer3at.wbt)
 # En cada arranque se lee el .wbt, se actualiza generated_map.json y se construye GRID.
 # ============================================================================
 
-# Valores por defecto si el JSON no trae start/goals.
-INICIO_MUNDO_POR_DEFECTO = (-4.25, 10.25)
-OBJETIVOS_MUNDO_POR_DEFECTO = [
-    (-4.25, 7.25),
-]
-BATERIA_MAX = 800 # NÚMERO DE UNIDADES DE BATERÍA, 1 UNIDAD = PASO DE 32ms
 # Consumo por celda: libre (0) → 1; zona de coste → valor del grid.
 # Si True, pasos diagonales consumen coste_celda × sqrt(2) (como la planificación).
 USAR_FACTOR_DIAGONAL_BATERIA = False
@@ -324,7 +322,7 @@ def imprimir_configuracion_planificacion():
     if ALGORITMO != "dijkstra":
         print("Heuristica:", _ETIQUETAS_HEURISTICA.get(HEURISTICA, HEURISTICA))
     print("Coste zona 1 (azul)  :", COSTE_ZONA_1)
-    print("Coste zona 2 (marron):", COSTE_ZONA_2)
+    print("Coste zona 2 (verde):", COSTE_ZONA_2)
     print("Coste zona 3 (amar.) :", COSTE_ZONA_3)
     if ALGORITMO == "ara_star":
         print("Modo ARA:", MODO_ARA)

@@ -2,13 +2,9 @@ import math
 
 # menu_heuristica importa robot_io antes que config para que getWorldPath()
 # apunte al .wbt que Webots tiene realmente abierto.
-from configuracion import preset
 
-if preset.USAR_PRESET:
-    preset.aplicar()
-else:
-    from simulacion import menu_heuristica
-    menu_heuristica.elegir_configuracion()
+from simulacion import menu_heuristica
+menu_heuristica.elegir_configuracion()
 
 from configuracion import config
 

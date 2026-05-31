@@ -424,7 +424,7 @@ def _buscar_camino(inicio, objetivo, heuristica=None, usar_coste=True, peso_heur
 
     abiertos = []
     viene_de = {inicio: None}
-    coste = {inicio: 0}
+    coste = {inicio: 0.0}
     nodos_explorados = 0
 
     # Si no se pasa heurística, se usa h(n)=0.
@@ -440,7 +440,7 @@ def _buscar_camino(inicio, objetivo, heuristica=None, usar_coste=True, peso_heur
     else:
         prioridad_inicial = h_inicial
 
-    heappush(abiertos, (prioridad_inicial, 0, inicio))
+    heappush(abiertos, (prioridad_inicial, 0.0, inicio))
 
     while abiertos:
         _, coste_actual, actual = heappop(abiertos)
@@ -466,7 +466,7 @@ def _buscar_camino(inicio, objetivo, heuristica=None, usar_coste=True, peso_heur
                 prioridad = h
 
             if vecino not in coste or nuevo_coste < coste[vecino]:
-                coste[vecino] = float(nuevo_coste)
+                coste[vecino] = nuevo_coste
                 viene_de[vecino] = actual
                 heappush(abiertos, (prioridad, nuevo_coste, vecino))
 

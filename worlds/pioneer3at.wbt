@@ -151,13 +151,13 @@ DEF COST_ZONE_2 Solid {
   name "COST_ZONE_2"
 }
 
-# Zona 2 marron (pasillo izquierdo). Coste g → COSTE_ZONA_2 en config.py.
+# Zona 2 verde (pasillo izquierdo). Coste g → COSTE_ZONA_2 en config.py.
 DEF COST_ZONE_3 Solid {
-  translation -8.25 0.5 0.008
+  translation -8.25 -1 0.008
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0.55 0.35 0.15
+        baseColor 0.18 0.72 0.28
         roughness 0.35
         metalness 0
         transparency 0.3
@@ -212,18 +212,18 @@ DEF WALL_LEFT_TOP Solid {
 }
 
 DEF WALL_LEFT Solid {
-  translation -4.75 -2.5 0.25
+  translation -4.75 -4 0.25
   children [
     Shape {
       appearance USE WALL_APP
       geometry Box {
-        size 0.5 12 0.5
+        size 0.5 9 0.5
       }
     }
   ]
   name "WALL_LEFT_RECT"
   boundingObject Box {
-    size 0.5 12 0.5
+    size 0.5 9 0.5
   }
 }
 
@@ -343,7 +343,7 @@ DEF WALL_006 Solid {
 
 
 DEF WALL_008 Solid {
-  translation -1.5 3.25 0.25
+  translation -4.75 3.25 0.25
   children [
     Shape {
       appearance USE WALL_APP

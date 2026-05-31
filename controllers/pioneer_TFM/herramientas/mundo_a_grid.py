@@ -1,19 +1,17 @@
 """
 Visualiza la rejilla GRID y la ruta planificada.
 
-Genera map_visualization_simple.png con muros (gris oscuro), margen de
-seguridad (gris claro), contorno rojo (zona no transitable: muro + margen),
-S, G y camino.
-
-Si ALGORITMO == "ara_star", el camino depende de MODO_ARA en config.py:
-  - offline: ruta final (azul)
-  - anytime_simple: ruta ejecutada por fases (naranja)
+Genera tres PNG en herramientas/:
+  - map_ida.png
+  - map_vuelta.png
+  - map_ida_vuelta.png  (tambien map_visualization_simple.png)
 
 Uso:
     python3 controllers/pioneer_TFM/herramientas/mundo_a_grid.py
 """
 
 import os
+import shutil
 import sys
 
 MPLCONFIGDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".mpl-cache")
@@ -56,14 +54,149 @@ COLOR_LIBRE = (1.0, 1.0, 1.0)
 COLOR_MARGEN = (0.82, 0.82, 0.82)
 COLOR_MURO = (0.15, 0.15, 0.15)
 COLOR_ZONA_COSTE = (0.12, 0.45, 0.95)
+# Colores baseColor del .wbt (pioneer3at.wbt)
+COLORES_ZONA_MUNDO = {
+    "COST_ZONE_2": (0.12, 0.45, 0.95),  # azul
+    "COST_ZONE_3": (0.18, 0.72, 0.28),  # verde
+    "COST_ZONE_4": (0.95, 0.55, 0.12),  # amarillo
+}
+
+
+def _color_zona_mundo(zona):
+    return COLORES_ZONA_MUNDO.get(zona.get("name"), COLOR_ZONA_COSTE)
+
+
 COLOR_RUTA_OFFLINE = "royalblue"
-COLOR_RUTA_ANYTIME = "darkorange"
+COLOR_RUTA_INICIAL = "0.55"
+COLOR_RUTA_INTERMEDIA = "darkorange"
+COLOR_RUTA_FINAL = "royalblue"
+COLOR_IDA_COMBINADO = "green"
+COLOR_VUELTA_COMBINADO = "royalblue"
+MARKER_SIZE_IDA = 6
+MARKER_SIZE_VUELTA = 11
+MARKER_EDGE_VUELTA = 1.5
+
+
+def son_la_misma_ruta_ida_vuelta(ruta_ida, ruta_vuelta):
+    """True si la ida coincide exactamente con la vuelta en orden inverso."""
+    if not ruta_ida or not ruta_vuelta:
+        return False
+    return list(ruta_ida) == list(reversed(ruta_vuelta))
+
+
+def _rutas_ida_vuelta(rutas):
+    if not rutas:
+        return [], []
+    ruta_ida = list(rutas[0])
+    ruta_vuelta = list(rutas[-1]) if len(rutas) > 1 else []
+    return ruta_ida, ruta_vuelta
+
+
+def _informe_anytime_principal():
+    """Primer tramo ARA* en modo anytime_simple (p. ej. inicio -> objetivo)."""
+    for informe in algoritmos.INFORME_ARA_MISION:
+        if informe.get("modo") == "anytime_simple":
+            return informe
+    return None
+
+
+def _seleccionar_rutas_anytime(informe):
+    """
+    Elige que rutas dibujar:
+    - inicial: siempre la primera
+    - intermedias: solo si cambian respecto a la anterior
+    - final: siempre la ruta final del informe
+    """
+    historial = informe.get("historial", [])
+    if not historial:
+        final = list(informe.get("ruta_final", []))
+        return [], [], final
+
+    inicial = list(historial[0]["ruta_calculada"])
+    intermedias = []
+    anterior = inicial
+
+    for entry in historial[1:]:
+        if entry.get("accion") != "ruta actualizada":
+            continue
+        nueva = list(entry["ruta_calculada"])
+        if nueva != anterior:
+            intermedias.append(nueva)
+        anterior = nueva
+
+    final = list(informe.get("ruta_final", historial[-1]["ruta_calculada"]))
+    return inicial, intermedias, final
+
+
+def _marcador_leyenda_ida(label="Ruta ida"):
+    return Line2D(
+        [0], [0], color=COLOR_IDA_COMBINADO, marker="o", markersize=MARKER_SIZE_IDA,
+        linestyle="None", label=label,
+    )
+
+
+def _marcador_leyenda_vuelta(label="Ruta vuelta"):
+    return Line2D(
+        [0], [0], color=COLOR_VUELTA_COMBINADO, marker="o", markersize=MARKER_SIZE_VUELTA,
+        fillstyle="none", markeredgewidth=MARKER_EDGE_VUELTA, linestyle="None", label=label,
+    )
+
+
+def _dibujar_circulo_ruta(ax, ruta, color, markersize, hueco=False, zorder=10):
+    """Mismos circulos que la leyenda, centrados en (col, fila)."""
+    omitir = {CELDA_INICIO, *CELDAS_OBJETIVO}
+    for fila, col in ruta:
+        if (fila, col) in omitir:
+            continue
+        ax.plot(
+            col,
+            fila,
+            marker="o",
+            markersize=markersize,
+            markerfacecolor="none" if hueco else color,
+            markeredgecolor=color,
+            markeredgewidth=MARKER_EDGE_VUELTA if hueco else 0.8,
+            linestyle="None",
+            zorder=zorder,
+        )
+
+
+def _dibujar_ruta_combinada_ida_vuelta(ax, ruta_ida, ruta_vuelta, ida_vuelta_comun):
+    """Mapa combinado: punto verde (ida) sobre circulo azul hueco (vuelta)."""
+    if ida_vuelta_comun:
+        _dibujar_circulo_ruta(
+            ax, ruta_ida, COLOR_IDA_COMBINADO, MARKER_SIZE_IDA, hueco=False, zorder=10,
+        )
+        return
+    _dibujar_circulo_ruta(
+        ax, ruta_vuelta, COLOR_VUELTA_COMBINADO, MARKER_SIZE_VUELTA, hueco=True, zorder=9,
+    )
+    _dibujar_circulo_ruta(
+        ax, ruta_ida, COLOR_IDA_COMBINADO, MARKER_SIZE_IDA, hueco=False, zorder=10,
+    )
+
+
+def _leyenda_rutas_anytime(rutas_intermedias):
+    """Leyenda ARA* anytime en mapa de ida: gris / naranja / verde (ruta final)."""
+    entradas = [
+        Line2D(
+            [0], [0], color=COLOR_RUTA_INICIAL, marker="o", markersize=MARKER_SIZE_IDA,
+            linestyle="None", label="Ruta inicial",
+        ),
+    ]
+    if rutas_intermedias:
+        entradas.append(
+            Line2D(
+                [0], [0], color=COLOR_RUTA_INTERMEDIA, marker="o", markersize=MARKER_SIZE_IDA,
+                linestyle="None", label="Ruta recalculada",
+            )
+        )
+    entradas.append(_marcador_leyenda_ida("Ruta final"))
+    return entradas
 
 
 def _estilo_ruta_mapa():
-    """Color y leyenda del camino segun algoritmo y MODO_ARA."""
-    if ALGORITMO == "ara_star" and MODO_ARA == "anytime_simple":
-        return COLOR_RUTA_ANYTIME, "Ruta ejecutada (anytime)"
+    """Color y leyenda del camino cuando no es ARA* anytime."""
     if ALGORITMO == "ara_star":
         return COLOR_RUTA_OFFLINE, "Ruta final (offline)"
     return COLOR_RUTA_OFFLINE, "Ruta planificada"
@@ -125,7 +258,7 @@ def dibujar_zonas_coste(ax):
         if None in (row_ini, row_fin, col_ini, col_fin):
             continue
 
-        color = tuple(zona.get("color", COLOR_ZONA_COSTE))
+        color = _color_zona_mundo(zona)
         ancho = col_fin - col_ini + 1
         alto = row_fin - row_ini + 1
         ax.add_patch(
@@ -165,13 +298,13 @@ def _leyenda_zonas_coste():
 
     _etiquetas = {
         "COST_ZONE_2": "Zona 1 azul (arriba)",
-        "COST_ZONE_3": "Zona 2 marron (izquierda)",
+        "COST_ZONE_3": "Zona 2 verde (izquierda)",
         "COST_ZONE_4": "Zona 3 amarilla (centro)",
     }
     entradas = []
     for zona in ZONAS_COSTE:
         nombre = zona["name"]
-        color = tuple(zona.get("color", COLOR_ZONA_COSTE))
+        color = _color_zona_mundo(zona)
         coste = coste_de_zona(nombre)
         etiqueta = _etiquetas.get(nombre, nombre)
         entradas.append(
@@ -212,83 +345,10 @@ def construir_camino_mision():
         if not ruta:
             continue
         camino.extend(ruta if i == 0 else ruta[1:])
-    return camino, nodos
+    return camino, nodos, rutas
 
 
-def main():
-    color_ruta, etiqueta_ruta = _estilo_ruta_mapa()
-    imprimir_configuracion_planificacion()
-    camino, nodos = construir_camino_mision()
-    coste_g = coste_camino(camino)
-
-    if ALGORITMO == "ara_star":
-        print(f"Modo ARA*: {MODO_ARA}")
-        for informe in algoritmos.INFORME_ARA_MISION:
-            imprimir_detalle_informe_ara(informe)
-
-    capa_terreno = construir_capa_terreno()
-
-    fig, ax = plt.subplots(figsize=(10, 10))
-
-    ax.imshow(
-        capa_terreno,
-        origin="lower",
-        interpolation="nearest",
-    )
-
-    dibujar_zonas_coste(ax)
-
-    ax.set_xticks(np.arange(-0.5, COLUMNAS_MAPA, 1), minor=True)
-    ax.set_yticks(np.arange(-0.5, FILAS_MAPA, 1), minor=True)
-    ax.grid(which="minor", color="lightgray", linestyle="-", linewidth=0.25)
-    ax.tick_params(which="both", bottom=False, left=False, labelbottom=False, labelleft=False)
-
-    dibujar_contorno_exterior(ax)
-
-    ax.legend(
-        handles=[
-            Patch(facecolor=COLOR_MURO, edgecolor="none", label="Muro físico"),
-            Patch(facecolor=COLOR_MARGEN, edgecolor="none", label="Margen de seguridad"),
-            Line2D(
-                [0],
-                [0],
-                color="red",
-                linestyle="--",
-                linewidth=1.2,
-                label="Zona no transitable (muro + margen)",
-            ),
-            *_leyenda_zonas_coste(),
-            Line2D(
-                [0],
-                [0],
-                marker="*",
-                color="w",
-                markerfacecolor=color_ruta,
-                markersize=12,
-                linestyle="None",
-                label=etiqueta_ruta,
-            ),
-        ],
-        loc="upper right",
-        fontsize=8,
-        framealpha=0.9,
-    )
-
-    for fila, columna in camino:
-        if (fila, columna) != CELDA_INICIO and (fila, columna) not in CELDAS_OBJETIVO:
-            ax.text(columna, fila, "*", ha="center", va="center", color=color_ruta,
-                    fontsize=20, fontweight="bold", zorder=10)
-
-    ax.text(CELDA_INICIO[1], CELDA_INICIO[0], "S", ha="center", va="center",
-            color="green", fontsize=20, fontweight="bold", zorder=10)
-
-    for i, (fila, columna) in enumerate(CELDAS_OBJETIVO, start=1):
-        ax.text(columna, fila, f"G{i}", ha="center", va="center",
-                color="red", fontsize=14, fontweight="bold", zorder=10)
-
-    if not camino:
-        print("No se ha encontrado ruta.")
-
+def _texto_modo_algoritmo():
     _nombres_alg = {
         "dijkstra": "Dijkstra",
         "astar": "A*",
@@ -299,27 +359,220 @@ def main():
         modo = _nombres_alg["dijkstra"]
     else:
         modo = f"{_nombres_alg.get(ALGORITMO, ALGORITMO)} + {HEURISTICA.capitalize()}"
-
     if ALGORITMO == "ara_star":
         if MODO_ARA == "anytime_simple":
             modo += f" | anytime ({PASOS_POR_FASE_ARA} pasos/fase)"
         else:
             modo += " | offline"
-
     modo += f" | costes zona={COSTE_ZONA_1:g}/{COSTE_ZONA_2:g}/{COSTE_ZONA_3:g}"
+    return modo
+
+
+def _leyenda_ruta_mapa(
+    dibujar_ida,
+    dibujar_vuelta,
+    ida_vuelta_comun,
+    color_ruta,
+    etiqueta_ruta,
+    informe_anytime,
+    rutas_intermedias,
+):
+    if informe_anytime and dibujar_ida and not dibujar_vuelta:
+        return _leyenda_rutas_anytime(rutas_intermedias)
+    if dibujar_ida and dibujar_vuelta and ida_vuelta_comun:
+        return [_marcador_leyenda_ida("Ruta común ida/vuelta")]
+    if dibujar_ida and dibujar_vuelta:
+        return [_marcador_leyenda_ida(), _marcador_leyenda_vuelta()]
+    if dibujar_ida:
+        return [_marcador_leyenda_ida("Ruta ida")]
+    if dibujar_vuelta:
+        return [_marcador_leyenda_vuelta()]
+    return [
+        Line2D(
+            [0], [0], marker="o", color="w", markerfacecolor=color_ruta,
+            markersize=12, linestyle="None", label=etiqueta_ruta,
+        ),
+    ]
+
+
+def _dibujar_rutas_en_mapa(
+    ax,
+    ruta_ida,
+    ruta_vuelta,
+    dibujar_ida,
+    dibujar_vuelta,
+    color_ruta,
+    informe_anytime,
+    rutas_anytime,
+):
+    ida_vuelta_comun = son_la_misma_ruta_ida_vuelta(ruta_ida, ruta_vuelta)
+
+    if informe_anytime and dibujar_ida and not dibujar_vuelta:
+        ruta_inicial, rutas_intermedias, ruta_final = rutas_anytime
+        _dibujar_circulo_ruta(
+            ax, ruta_inicial, COLOR_RUTA_INICIAL, MARKER_SIZE_IDA, hueco=False, zorder=8,
+        )
+        for ruta in rutas_intermedias:
+            _dibujar_circulo_ruta(
+                ax, ruta, COLOR_RUTA_INTERMEDIA, MARKER_SIZE_IDA, hueco=False, zorder=9,
+            )
+        _dibujar_circulo_ruta(
+            ax, ruta_final, COLOR_IDA_COMBINADO, MARKER_SIZE_IDA, hueco=False, zorder=10,
+        )
+        return
+
+    if dibujar_ida and dibujar_vuelta:
+        _dibujar_ruta_combinada_ida_vuelta(ax, ruta_ida, ruta_vuelta, ida_vuelta_comun)
+        return
+
+    if dibujar_ida:
+        _dibujar_circulo_ruta(
+            ax, ruta_ida, COLOR_IDA_COMBINADO, MARKER_SIZE_IDA, hueco=False, zorder=10,
+        )
+    if dibujar_vuelta:
+        _dibujar_circulo_ruta(
+            ax, ruta_vuelta, COLOR_VUELTA_COMBINADO, MARKER_SIZE_VUELTA, hueco=True, zorder=10,
+        )
+
+
+def guardar_mapa(
+    capa_terreno,
+    ruta_ida,
+    ruta_vuelta,
+    dibujar_ida,
+    dibujar_vuelta,
+    nombre_archivo,
+    titulo_tramo,
+    modo_texto,
+    coste_g,
+    nodos,
+    len_camino,
+    color_ruta,
+    etiqueta_ruta,
+    informe_anytime=None,
+    rutas_anytime=([], [], []),
+):
+    """Genera un PNG; la leyenda queda fuera del mapa (margen derecho)."""
+    ida_vuelta_comun = son_la_misma_ruta_ida_vuelta(ruta_ida, ruta_vuelta)
+    leyenda_ruta = _leyenda_ruta_mapa(
+        dibujar_ida,
+        dibujar_vuelta,
+        ida_vuelta_comun,
+        color_ruta,
+        etiqueta_ruta,
+        informe_anytime,
+        rutas_anytime[1],
+    )
+
+    fig, ax = plt.subplots(figsize=(11, 10))
+    fig.subplots_adjust(right=0.72)
+
+    ax.imshow(capa_terreno, origin="lower", interpolation="nearest")
+    dibujar_zonas_coste(ax)
+    ax.set_xticks(np.arange(-0.5, COLUMNAS_MAPA, 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, FILAS_MAPA, 1), minor=True)
+    ax.grid(which="minor", color="lightgray", linestyle="-", linewidth=0.25)
+    ax.tick_params(which="both", bottom=False, left=False, labelbottom=False, labelleft=False)
+    dibujar_contorno_exterior(ax)
+
+    ax.legend(
+        handles=[
+            Patch(facecolor=COLOR_MURO, edgecolor="none", label="Muro físico"),
+            Patch(facecolor=COLOR_MARGEN, edgecolor="none", label="Margen de seguridad"),
+            Line2D(
+                [0], [0], color="red", linestyle="--", linewidth=1.2,
+                label="Zona no transitable (muro + margen)",
+            ),
+            *_leyenda_zonas_coste(),
+            *leyenda_ruta,
+        ],
+        loc="upper left",
+        bbox_to_anchor=(1.02, 1.0),
+        fontsize=8,
+        framealpha=0.9,
+    )
+
+    ax.text(
+        CELDA_INICIO[1], CELDA_INICIO[0], "S",
+        ha="center", va="center", color="green", fontsize=20, fontweight="bold", zorder=10,
+    )
+    for i, (fila, columna) in enumerate(CELDAS_OBJETIVO, start=1):
+        ax.text(
+            columna, fila, f"G{i}",
+            ha="center", va="center", color="red", fontsize=14, fontweight="bold", zorder=10,
+        )
+
+    _dibujar_rutas_en_mapa(
+        ax, ruta_ida, ruta_vuelta, dibujar_ida, dibujar_vuelta,
+        color_ruta, informe_anytime, rutas_anytime,
+    )
 
     ax.set_title(
-        f"Mapa {FILAS_MAPA}x{COLUMNAS_MAPA} | {modo} | "
-        f"longitud={len(camino)} celdas | coste_g={coste_g:.1f} | nodos={nodos} | "
+        f"{titulo_tramo} | Mapa {FILAS_MAPA}x{COLUMNAS_MAPA} | {modo_texto} | "
+        f"longitud={len_camino} celdas | coste_g={coste_g:.1f} | nodos={nodos} | "
         f"objetivos={len(CELDAS_OBJETIVO)}"
     )
 
-    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "map_visualization_simple.png")
-    plt.tight_layout()
-    plt.savefig(out, dpi=150)
+    plt.savefig(nombre_archivo, dpi=150, bbox_inches="tight", pad_inches=0.2)
     plt.close(fig)
+    print(f"Mapa guardado en {nombre_archivo}")
+def main():
+    usar_anytime = ALGORITMO == "ara_star" and MODO_ARA == "anytime_simple"
+    color_ruta, etiqueta_ruta = _estilo_ruta_mapa()
+    imprimir_configuracion_planificacion()
+    camino, nodos, rutas = construir_camino_mision()
+    coste_g = coste_camino(camino)
+    ruta_ida, ruta_vuelta = _rutas_ida_vuelta(rutas)
+
+    informe_anytime = _informe_anytime_principal() if usar_anytime else None
+    rutas_anytime = ([], [], [])
+    if informe_anytime:
+        rutas_anytime = _seleccionar_rutas_anytime(informe_anytime)
+
+    if ALGORITMO == "ara_star":
+        print(f"Modo ARA*: {MODO_ARA}")
+        for informe in algoritmos.INFORME_ARA_MISION:
+            imprimir_detalle_informe_ara(informe)
+
+    if not camino:
+        print("No se ha encontrado ruta.")
+
+    capa_terreno = construir_capa_terreno()
+    modo_texto = _texto_modo_algoritmo()
+    carpeta = os.path.dirname(os.path.abspath(__file__))
+
+    mapas = [
+        ("map_ida.png", True, False, "Ruta de ida"),
+        ("map_vuelta.png", False, True, "Ruta de vuelta"),
+        ("map_ida_vuelta.png", True, True, "Ruta ida y vuelta"),
+    ]
+
+    for archivo, dibujar_ida, dibujar_vuelta, titulo in mapas:
+        guardar_mapa(
+            capa_terreno,
+            ruta_ida,
+            ruta_vuelta,
+            dibujar_ida,
+            dibujar_vuelta,
+            os.path.join(carpeta, archivo),
+            titulo,
+            modo_texto,
+            coste_g,
+            nodos,
+            len(camino),
+            color_ruta,
+            etiqueta_ruta,
+            informe_anytime=informe_anytime if dibujar_ida and not dibujar_vuelta else None,
+            rutas_anytime=rutas_anytime,
+        )
+
+    # Compatibilidad con nombre anterior
+    origen = os.path.join(carpeta, "map_ida_vuelta.png")
+    destino = os.path.join(carpeta, "map_visualization_simple.png")
+    shutil.copy2(origen, destino)
+
     print(
-        f"Mapa guardado en {out} | longitud={len(camino)} | coste_g={coste_g:.1f} | nodos={nodos}"
+        f"Resumen | longitud={len(camino)} | coste_g={coste_g:.1f} | nodos={nodos}"
     )
 
 
