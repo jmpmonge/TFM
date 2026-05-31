@@ -134,7 +134,7 @@ DEF GOAL_ARA Solid {
 
 # Zona 1 azul (arriba del laberinto). Coste g → COSTE_ZONA_1 en config.py.
 DEF COST_ZONE_1 Solid {
-  translation 4.5 10.25 0.008
+  translation 1.5 10.25 0.008
   children [
     Shape {
       appearance PBRAppearance {

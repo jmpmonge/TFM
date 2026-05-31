@@ -138,7 +138,7 @@ def dibujar_bateria(bateria_actual, bateria_max, valor_grid=0, consumo_celda=Non
     display.fillRectangle(margen + 1, y_barra + 1, max(0, ancho_relleno - 2), max(0, alto_barra - 2))
 
     if en_zona:
-        etiqueta = "ZONA CARA" if zona_cara else "ZONA COSTE"
+        etiqueta = "ZONA ALTO COSTE" if zona_cara else "ZONA COSTE"
         texto_zona = f"{etiqueta}: {int(consumo_celda)}"
         y_aviso = y_barra + alto_barra + 4
         if y_aviso + 10 <= alto_display:

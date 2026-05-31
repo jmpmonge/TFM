@@ -23,13 +23,16 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
-from matplotlib.patches import Patch, Rectangle
+from matplotlib.patches import FancyBboxPatch, Patch, Rectangle
+from matplotlib.transforms import ScaledTranslation
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from planificacion import algoritmos
 from planificacion.algoritmos import coste_camino, imprimir_detalle_informe_ara, planificar_mision
+from configuracion import config
+from configuracion import config_menu
 from configuracion.config import (
     BATERIA_MAX,
     CELDA_INICIO,
@@ -41,10 +44,6 @@ from configuracion.config import (
     HEURISTICA,
     MODO_ARA,
     PASOS_POR_FASE_ARA,
-    COSTE_ZONA_1,
-    COSTE_ZONA_2,
-    COSTE_ZONA_3,
-    coste_de_zona,
     ZONAS_COSTE,
     _GRID_BASE,
     imprimir_configuracion_planificacion,
@@ -291,8 +290,17 @@ def dibujar_zonas_coste(ax):
             )
 
 
+def _coste_zona_en_grid(nombre):
+    """Coste g de la leyenda: valor real del GRID (experimento.json + suelo cambiante)."""
+    for row, col in config.CELDAS_POR_ZONA.get(nombre, []):
+        valor = config.GRID[row][col]
+        if valor > 1:
+            return float(valor)
+    return config.coste_de_zona(nombre)
+
+
 def _leyenda_zonas_coste():
-    """Una entrada por zona con su color del .wbt y coste g de config."""
+    """Una entrada por zona con su color del .wbt y coste g del GRID actual."""
     if not ZONAS_COSTE:
         return []
 
@@ -305,7 +313,7 @@ def _leyenda_zonas_coste():
     for zona in ZONAS_COSTE:
         nombre = zona["name"]
         color = _color_zona_mundo(zona)
-        coste = coste_de_zona(nombre)
+        coste = _coste_zona_en_grid(nombre)
         etiqueta = _etiquetas.get(nombre, nombre)
         entradas.append(
             Patch(
@@ -348,7 +356,41 @@ def construir_camino_mision():
     return camino, nodos, rutas
 
 
-def _texto_modo_algoritmo():
+_ESTILO_MARCO_PANEL = dict(
+    facecolor="white",
+    edgecolor="0.8",
+    alpha=0.9,
+    linewidth=0.8,
+)
+_FONT_PANEL = 9
+_X_PANEL_IZQ = 0.0
+_Y_TOPE_LEYENDA = 1.0
+_SEP_MARCOS_PT = 10
+_OFFSET_TEXTO_RESUMEN_PT = 4
+
+
+def _eje_y_desde_puntos(puntos, ax_panel, renderer):
+    """Convierte puntos tipograficos a fraccion del eje Y del panel."""
+    altura_px = ax_panel.get_window_extent(renderer).height
+    if altura_px <= 0:
+        return puntos / 500.0
+    return (puntos / 72.0) * renderer.dpi / altura_px
+
+
+def _alinear_panel_con_mapa(ax, ax_panel, fig, ancho_panel=0.24, separacion=0.015):
+    """Iguala altura y base del panel derecho con el eje del mapa."""
+    fig.canvas.draw()
+    pos_mapa = ax.get_position()
+    ax_panel.set_position([
+        pos_mapa.x1 + separacion,
+        pos_mapa.y0,
+        ancho_panel,
+        pos_mapa.height,
+    ])
+
+
+def _lineas_resumen_mapa(titulo_tramo, len_camino, coste_g, nodos):
+    """Texto del resumen: una linea por concepto."""
     _nombres_alg = {
         "dijkstra": "Dijkstra",
         "astar": "A*",
@@ -356,16 +398,134 @@ def _texto_modo_algoritmo():
         "ara_star": "ARA*",
     }
     if ALGORITMO == "dijkstra":
-        modo = _nombres_alg["dijkstra"]
+        algoritmo_txt = _nombres_alg["dijkstra"]
     else:
-        modo = f"{_nombres_alg.get(ALGORITMO, ALGORITMO)} + {HEURISTICA.capitalize()}"
+        algoritmo_txt = f"{_nombres_alg.get(ALGORITMO, ALGORITMO)} + {HEURISTICA.capitalize()}"
+
+    lineas = [
+        f"Tramo: {titulo_tramo}",
+        f"Mapa: {FILAS_MAPA} x {COLUMNAS_MAPA}",
+        f"Algoritmo: {algoritmo_txt}",
+    ]
+
     if ALGORITMO == "ara_star":
         if MODO_ARA == "anytime_simple":
-            modo += f" | anytime ({PASOS_POR_FASE_ARA} pasos/fase)"
+            lineas.append(f"Modo ARA*: anytime ({PASOS_POR_FASE_ARA} pasos/fase)")
         else:
-            modo += " | offline"
-    modo += f" | costes zona={COSTE_ZONA_1:g}/{COSTE_ZONA_2:g}/{COSTE_ZONA_3:g}"
-    return modo
+            lineas.append("Modo ARA*: offline")
+
+    lineas.extend([
+        f"Costes zona: {config.COSTE_ZONA_1:g} / {config.COSTE_ZONA_2:g} / {config.COSTE_ZONA_3:g}",
+        f"Longitud: {len_camino} celdas",
+        f"Coste g: {coste_g:.1f}",
+        f"Nodos: {nodos}",
+        f"Objetivos: {len(CELDAS_OBJETIVO)}",
+    ])
+    return lineas
+
+
+def _bbox_marco_leyenda(leyenda, ax_panel, renderer):
+    return leyenda.get_frame().get_window_extent(renderer).transformed(
+        ax_panel.transAxes.inverted()
+    )
+
+
+def _insets_verticales_leyenda(leyenda, bbox_marco, ax_panel, renderer):
+    """Margenes superior e inferior del marco de leyenda."""
+    textos = leyenda.get_texts()
+    if not textos:
+        return 0.03, 0.03
+
+    bbox_etq = textos[0].get_window_extent(renderer).transformed(
+        ax_panel.transAxes.inverted()
+    )
+    bbox_ult = textos[-1].get_window_extent(renderer).transformed(
+        ax_panel.transAxes.inverted()
+    )
+    inset_sup = bbox_marco.y1 - bbox_etq.y1
+    inset_inf = bbox_ult.y0 - bbox_marco.y0
+    return inset_sup, inset_inf
+
+
+def _x_inicio_iconos_leyenda(leyenda, bbox_marco, ax_panel, renderer):
+    """X donde empiezan los dibujos de la leyenda (iconos/colores), no las etiquetas."""
+    handles = getattr(leyenda, "legend_handles", None) or getattr(
+        leyenda, "legendHandles", []
+    )
+    x_min = None
+    for handle in handles:
+        bbox = handle.get_window_extent(renderer).transformed(
+            ax_panel.transAxes.inverted()
+        )
+        if x_min is None or bbox.x0 < x_min:
+            x_min = bbox.x0
+    if x_min is not None:
+        return x_min
+    return bbox_marco.x0 + 0.03
+
+
+def _dibujar_panel_derecho(ax_panel, fig, handles_leyenda, lineas_resumen):
+    """Leyenda y resumen con el mismo borde izquierdo y ancho de marco."""
+    ax_panel.set_xlim(0, 1)
+    ax_panel.set_ylim(0, 1)
+    ax_panel.axis("off")
+
+    leyenda = ax_panel.legend(
+        handles=handles_leyenda,
+        loc="upper left",
+        bbox_to_anchor=(_X_PANEL_IZQ, _Y_TOPE_LEYENDA),
+        fontsize=_FONT_PANEL,
+        framealpha=_ESTILO_MARCO_PANEL["alpha"],
+        edgecolor=_ESTILO_MARCO_PANEL["edgecolor"],
+        facecolor=_ESTILO_MARCO_PANEL["facecolor"],
+        fancybox=True,
+        borderpad=0.5,
+        borderaxespad=0,
+        labelspacing=0.35,
+    )
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    bbox_marco = _bbox_marco_leyenda(leyenda, ax_panel, renderer)
+    inset_sup, inset_inf = _insets_verticales_leyenda(
+        leyenda, bbox_marco, ax_panel, renderer
+    )
+
+    sep_marcos = _eje_y_desde_puntos(_SEP_MARCOS_PT, ax_panel, renderer)
+    y_tope_texto = max(0.02, bbox_marco.y0 - sep_marcos - inset_sup)
+    x_texto = _x_inicio_iconos_leyenda(leyenda, bbox_marco, ax_panel, renderer)
+    texto = "\n".join(lineas_resumen)
+    offset_x = ScaledTranslation(_OFFSET_TEXTO_RESUMEN_PT / 72.0, 0, fig.dpi_scale_trans)
+
+    resumen = ax_panel.text(
+        x_texto,
+        y_tope_texto,
+        texto,
+        transform=ax_panel.transAxes + offset_x,
+        fontsize=_FONT_PANEL,
+        va="top",
+        ha="left",
+        linespacing=1.35,
+        zorder=3,
+    )
+
+    fig.canvas.draw()
+    bbox_texto = resumen.get_window_extent(renderer).transformed(
+        ax_panel.transAxes.inverted()
+    )
+    y_marco = bbox_texto.y0 - inset_inf
+    alto_marco = (y_tope_texto + inset_sup) - y_marco
+
+    marco_resumen = FancyBboxPatch(
+        (bbox_marco.x0, y_marco),
+        bbox_marco.width,
+        alto_marco,
+        boxstyle="round,pad=0,rounding_size=0.015",
+        transform=ax_panel.transAxes,
+        zorder=2,
+        **_ESTILO_MARCO_PANEL,
+    )
+    ax_panel.add_patch(marco_resumen)
 
 
 def _leyenda_ruta_mapa(
@@ -443,7 +603,6 @@ def guardar_mapa(
     dibujar_vuelta,
     nombre_archivo,
     titulo_tramo,
-    modo_texto,
     coste_g,
     nodos,
     len_camino,
@@ -452,7 +611,7 @@ def guardar_mapa(
     informe_anytime=None,
     rutas_anytime=([], [], []),
 ):
-    """Genera un PNG; la leyenda queda fuera del mapa (margen derecho)."""
+    """Genera un PNG; leyenda y resumen a la derecha, alineados con el mapa."""
     ida_vuelta_comun = son_la_misma_ruta_ida_vuelta(ruta_ida, ruta_vuelta)
     leyenda_ruta = _leyenda_ruta_mapa(
         dibujar_ida,
@@ -464,8 +623,13 @@ def guardar_mapa(
         rutas_anytime[1],
     )
 
-    fig, ax = plt.subplots(figsize=(11, 10))
-    fig.subplots_adjust(right=0.72)
+    fig, (ax, ax_panel) = plt.subplots(
+        1,
+        2,
+        figsize=(12, 10),
+        gridspec_kw={"width_ratios": [2.75, 1.2], "wspace": 0.06},
+    )
+    ax_panel.axis("off")
 
     ax.imshow(capa_terreno, origin="lower", interpolation="nearest")
     dibujar_zonas_coste(ax)
@@ -475,22 +639,19 @@ def guardar_mapa(
     ax.tick_params(which="both", bottom=False, left=False, labelbottom=False, labelleft=False)
     dibujar_contorno_exterior(ax)
 
-    ax.legend(
-        handles=[
-            Patch(facecolor=COLOR_MURO, edgecolor="none", label="Muro físico"),
-            Patch(facecolor=COLOR_MARGEN, edgecolor="none", label="Margen de seguridad"),
-            Line2D(
-                [0], [0], color="red", linestyle="--", linewidth=1.2,
-                label="Zona no transitable (muro + margen)",
-            ),
-            *_leyenda_zonas_coste(),
-            *leyenda_ruta,
-        ],
-        loc="upper left",
-        bbox_to_anchor=(1.02, 1.0),
-        fontsize=8,
-        framealpha=0.9,
-    )
+    handles_leyenda = [
+        Patch(facecolor=COLOR_MURO, edgecolor="none", label="Muro físico"),
+        Patch(facecolor=COLOR_MARGEN, edgecolor="none", label="Margen de seguridad"),
+        Line2D(
+            [0], [0], color="red", linestyle="--", linewidth=1.2,
+            label="Zona no transitable (muro + margen)",
+        ),
+        *_leyenda_zonas_coste(),
+        *leyenda_ruta,
+    ]
+    lineas_resumen = _lineas_resumen_mapa(titulo_tramo, len_camino, coste_g, nodos)
+    _alinear_panel_con_mapa(ax, ax_panel, fig)
+    _dibujar_panel_derecho(ax_panel, fig, handles_leyenda, lineas_resumen)
 
     ax.text(
         CELDA_INICIO[1], CELDA_INICIO[0], "S",
@@ -507,16 +668,12 @@ def guardar_mapa(
         color_ruta, informe_anytime, rutas_anytime,
     )
 
-    ax.set_title(
-        f"{titulo_tramo} | Mapa {FILAS_MAPA}x{COLUMNAS_MAPA} | {modo_texto} | "
-        f"longitud={len_camino} celdas | coste_g={coste_g:.1f} | nodos={nodos} | "
-        f"objetivos={len(CELDAS_OBJETIVO)}"
-    )
-
     plt.savefig(nombre_archivo, dpi=150, bbox_inches="tight", pad_inches=0.2)
     plt.close(fig)
     print(f"Mapa guardado en {nombre_archivo}")
 def main():
+    config_menu.cargar_desde_archivo(config)
+
     usar_anytime = ALGORITMO == "ara_star" and MODO_ARA == "anytime_simple"
     color_ruta, etiqueta_ruta = _estilo_ruta_mapa()
     imprimir_configuracion_planificacion()
@@ -538,7 +695,6 @@ def main():
         print("No se ha encontrado ruta.")
 
     capa_terreno = construir_capa_terreno()
-    modo_texto = _texto_modo_algoritmo()
     carpeta = os.path.dirname(os.path.abspath(__file__))
 
     mapas = [
@@ -556,7 +712,6 @@ def main():
             dibujar_vuelta,
             os.path.join(carpeta, archivo),
             titulo,
-            modo_texto,
             coste_g,
             nodos,
             len(camino),
