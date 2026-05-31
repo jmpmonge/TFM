@@ -224,23 +224,13 @@ GRID = aplicar_margen_contorno(_GRID_BASE)
 # 3 zonas de coste: geometria en .wbt, coste g en COSTE_ZONA_1/2/3 arriba.
 ZONAS_COSTE = mapa.get("cost_zones", [])
 
-_COSTES_POR_INDICE = (
-    None,
-    lambda: COSTE_ZONA_1,
-    lambda: COSTE_ZONA_2,
-    lambda: COSTE_ZONA_3,
-)
-
-
 def coste_de_zona(nombre):
     """Devuelve el coste g configurado para COST_ZONE_1, _2 o _3."""
     coincidencia = re.match(r"^COST_ZONE_(\d+)$", nombre)
     if not coincidencia:
         return 1.0
     indice = int(coincidencia.group(1))
-    if 1 <= indice <= 3:
-        return _COSTES_POR_INDICE[indice]()
-    return 1.0
+    return {1: COSTE_ZONA_1, 2: COSTE_ZONA_2, 3: COSTE_ZONA_3}.get(indice, 1.0)
 
 
 CELDAS_POR_ZONA = {}

@@ -13,6 +13,7 @@ Uso:
 import os
 import shutil
 import sys
+from typing import TypedDict
 
 MPLCONFIGDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".mpl-cache")
 os.makedirs(MPLCONFIGDIR, exist_ok=True)
@@ -356,12 +357,19 @@ def construir_camino_mision():
     return camino, nodos, rutas
 
 
-_ESTILO_MARCO_PANEL = dict(
-    facecolor="white",
-    edgecolor="0.8",
-    alpha=0.9,
-    linewidth=0.8,
-)
+class _EstiloMarcoPanel(TypedDict):
+    facecolor: str
+    edgecolor: str
+    alpha: float
+    linewidth: float
+
+
+_ESTILO_MARCO_PANEL: _EstiloMarcoPanel = {
+    "facecolor": "white",
+    "edgecolor": "0.8",
+    "alpha": 0.9,
+    "linewidth": 0.8,
+}
 _FONT_PANEL = 9
 _X_PANEL_IZQ = 0.0
 _Y_TOPE_LEYENDA = 1.0
@@ -523,7 +531,10 @@ def _dibujar_panel_derecho(ax_panel, fig, handles_leyenda, lineas_resumen):
         boxstyle="round,pad=0,rounding_size=0.015",
         transform=ax_panel.transAxes,
         zorder=2,
-        **_ESTILO_MARCO_PANEL,
+        facecolor=_ESTILO_MARCO_PANEL["facecolor"],
+        edgecolor=_ESTILO_MARCO_PANEL["edgecolor"],
+        alpha=_ESTILO_MARCO_PANEL["alpha"],
+        linewidth=_ESTILO_MARCO_PANEL["linewidth"],
     )
     ax_panel.add_patch(marco_resumen)
 
