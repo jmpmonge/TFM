@@ -3,7 +3,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from planificacion.algoritmos import ara_star, astar, dijkstra, greedy
+from planificacion.algoritmos import astar, dijkstra, greedy
+from planificacion.ara import ara_star
 from configuracion.config import CELDA_INICIO, CELDA_OBJETIVO
 from planificacion.heuristicas import h_manhattan, h_euclidiana, h_octil, h_nula
 

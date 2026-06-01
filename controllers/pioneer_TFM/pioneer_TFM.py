@@ -11,17 +11,15 @@ from configuracion import config_menu
 config_menu.cargar_desde_archivo(config)
 menu_heuristica.elegir_configuracion()
 
-from planificacion.algoritmos import (
-    actualizar_suelo_cambiante_si_toca,
+from planificacion.ara_anytime import actualizar_suelo_cambiante_si_toca, reiniciar_suelo_cambiante
+from planificacion.costes import (
     coste_base_celda,
     coste_bateria_camino,
     coste_bateria_movimiento,
     log_consumo_bateria_celda,
-    planificar_mision,
-    aplanar_mision,
-    imprimir_resumen_planificacion,
-    reiniciar_suelo_cambiante,
 )
+from planificacion.logs_planificacion import imprimir_resumen_planificacion
+from planificacion.mision import aplanar_mision, planificar_mision
 from planificacion.mapa import celda_a_mundo
 from simulacion.robot_io import colocar_inicio, dibujar_bateria, fijar_velocidad_ruedas, leer_estado, paso
 from simulacion.seguimiento import decidir

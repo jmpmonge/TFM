@@ -32,16 +32,10 @@ import sys
 # (la carpeta padre, donde están planificacion/, configuracion/, etc.) al sys.path.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from planificacion.algoritmos import (
-    ara_star,
-    astar,
-    astar_ponderado,
-    coste_movimiento,
-    dijkstra,
-    filtrar_objetivos_por_bateria,
-    greedy,
-    planificar_mision,
-)
+from planificacion.algoritmos import astar, astar_ponderado, dijkstra, greedy
+from planificacion.ara import ara_star
+from planificacion.costes import coste_movimiento
+from planificacion.mision import filtrar_objetivos_por_bateria, planificar_mision
 from configuracion.config import (
     BATERIA_MAX,
     CELDA_INICIO,
