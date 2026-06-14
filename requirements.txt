@@ -1,0 +1,5 @@
+# Dependencias para scripts offline (mapas PNG, métricas, experimentos).
+# El controlador Webots usa el módulo `controller` incluido en Webots, no pip.
+
+matplotlib>=3.8
+numpy>=1.26
