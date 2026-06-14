@@ -110,8 +110,10 @@ def reiniciar_suelo_cambiante(costes_iniciales):
 
 
 def planificar_ara_anytime_simple(inicio, objetivo, heuristica, epsilons=None,
-                                  pasos_por_fase=None):
+                                  pasos_por_fase=None, cambiar_suelo=True):
     from planificacion.algoritmos import astar_ponderado
+
+    global _OMITIR_SUELO_CAMBIANTE
 
     epsilons = _epsilons_ara(epsilons)
     pasos_por_fase = config.PASOS_POR_FASE_ARA if pasos_por_fase is None else pasos_por_fase
@@ -123,59 +125,76 @@ def planificar_ara_anytime_simple(inicio, objetivo, heuristica, epsilons=None,
     historial = []
     nodos_totales = 0
 
-    for i, epsilon in enumerate(epsilons):
-        # ciclo por fase: calcular ruta → comparar → guardar historial → avanzar
-        suelo_actualizado = actualizar_suelo_cambiante_si_toca(i)
+    omitir_anterior = _OMITIR_SUELO_CAMBIANTE
+    if not cambiar_suelo:
+        _OMITIR_SUELO_CAMBIANTE = True
 
-        nueva_ruta, nodos = astar_ponderado(
-            posicion_actual,
-            objetivo,
-            heuristica,
-            peso_heuristica=epsilon,
-        )
-        nodos_totales += nodos
-        nuevo_coste = coste_camino(nueva_ruta) if nueva_ruta else float("inf")
+    try:
+        for i, epsilon in enumerate(epsilons):
+            # ciclo por fase: calcular ruta → comparar → guardar historial → avanzar
+            suelo_actualizado = actualizar_suelo_cambiante_si_toca(i)
 
-        if ruta_activa is None or suelo_actualizado or nuevo_coste < coste_restante_actual:
-            ruta_activa = nueva_ruta
-            coste_restante_actual = nuevo_coste
-            if i == 0:
-                accion = "ruta inicial"
-            elif suelo_actualizado:
-                accion = "ruta actualizada por cambio de suelo"
+            nueva_ruta, nodos = astar_ponderado(
+                posicion_actual,
+                objetivo,
+                heuristica,
+                peso_heuristica=epsilon,
+            )
+            nodos_totales += nodos
+            nuevo_coste = coste_camino(nueva_ruta) if nueva_ruta else float("inf")
+
+            ruta_activa_anterior = list(ruta_activa) if ruta_activa else []
+
+            if ruta_activa is None or suelo_actualizado or nuevo_coste < coste_restante_actual:
+                ruta_activa = nueva_ruta
+                coste_restante_actual = nuevo_coste
+                if i == 0:
+                    accion = "ruta inicial"
+                elif suelo_actualizado:
+                    accion = "ruta actualizada por cambio de suelo"
+                else:
+                    accion = "ruta actualizada"
             else:
-                accion = "ruta actualizada"
-        else:
-            accion = "se mantiene ruta anterior"
+                accion = "se mantiene ruta anterior"
 
-        historial.append({
-            "epsilon": epsilon,
-            "inicio_fase": posicion_actual,
-            "ruta_calculada": list(nueva_ruta),
-            "coste": nuevo_coste,
-            "nodos": nodos,
-            "accion": accion,
-            "costes_suelo": (
-                config.COSTE_ZONA_1,
-                config.COSTE_ZONA_2,
-                config.COSTE_ZONA_3,
-            ),
-            "suelo_actualizado": suelo_actualizado,
-        })
+            entrada = {
+                "modo": "anytime",
+                "epsilon": epsilon,
+                "inicio": posicion_actual,
+                "inicio_fase": posicion_actual,
+                "celdas": len(nueva_ruta),
+                "ruta_calculada": list(nueva_ruta),
+                "coste": nuevo_coste,
+                "nodos": nodos,
+                "accion": accion,
+                "costes_suelo": (
+                    config.COSTE_ZONA_1,
+                    config.COSTE_ZONA_2,
+                    config.COSTE_ZONA_3,
+                ),
+                "suelo_actualizado": suelo_actualizado,
+            }
+            if suelo_actualizado:
+                entrada["ruta_antes_cambio_suelo"] = ruta_activa_anterior
+                entrada["ruta_despues_cambio_suelo"] = list(nueva_ruta)
 
-        if not ruta_activa:
-            break
+            historial.append(entrada)
 
-        posicion_actual = _avanzar_sobre_ruta(
-            ruta_ejecutada, ruta_activa, posicion_actual, pasos_por_fase
-        )
+            if not ruta_activa:
+                break
 
-        if posicion_actual == objetivo:
-            break
+            posicion_actual = _avanzar_sobre_ruta(
+                ruta_ejecutada, ruta_activa, posicion_actual, pasos_por_fase
+            )
 
-    if posicion_actual != objetivo:
-        posicion_actual = _completar_hasta_objetivo(
-            ruta_ejecutada, ruta_activa, posicion_actual, objetivo
-        )
+            if posicion_actual == objetivo:
+                break
+
+        if posicion_actual != objetivo:
+            posicion_actual = _completar_hasta_objetivo(
+                ruta_ejecutada, ruta_activa, posicion_actual, objetivo
+            )
+    finally:
+        _OMITIR_SUELO_CAMBIANTE = omitir_anterior
 
     return ruta_ejecutada, historial, nodos_totales

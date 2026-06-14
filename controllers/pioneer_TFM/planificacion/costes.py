@@ -6,6 +6,14 @@ from configuracion import config
 def coste_base_celda(celda):
     """Coste base del terreno: libre (0) → 1; zona de coste → valor del GRID (puede ser 1)."""
     if celda in config.CELDAS_COSTE:
+        for nombre, celdas in config.CELDAS_POR_ZONA.items():
+            if celda in celdas:
+                if nombre == "COST_ZONE_1":
+                    return float(config.COSTE_ZONA_1)
+                if nombre == "COST_ZONE_2":
+                    return float(config.COSTE_ZONA_2)
+                if nombre == "COST_ZONE_3":
+                    return float(config.COSTE_ZONA_3)
         return float(config.GRID[celda[0]][celda[1]])
     valor = config.GRID[celda[0]][celda[1]]
     return 1.0 if valor == 0 else float(valor)

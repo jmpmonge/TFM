@@ -21,7 +21,7 @@
 #     decide si usar offline o anytime
 
 from planificacion.costes import coste_camino, coste_movimiento
-
+import configuracion.config as config
 
 ULTIMO_INFORME_ARA = None
 INFORME_ARA_MISION = []
@@ -165,10 +165,13 @@ def planificar_ara_offline(inicio, objetivo, heuristica, epsilons=None):
             coste = float("inf")
 
         historial.append({
+            "modo": "offline",
             "epsilon": epsilon,
-            "ruta": list(camino),
+            "inicio": inicio,
+            "celdas": len(camino),
             "coste": coste,
             "nodos": nodos_iteracion,
+            "ruta": list(camino),
         })
 
         # al bajar epsilon, INCONS vuelve a OPEN
@@ -182,8 +185,7 @@ def planificar_ara_offline(inicio, objetivo, heuristica, epsilons=None):
 
     return mejor_camino, historial, nodos_totales
 
-def ara_star(inicio, objetivo, heuristica, eps_inicial=None, eps_final=None, eps_paso=None):
-    from configuracion import config
+def ara_star(inicio, objetivo, heuristica, cambiar_suelo=True, modo=None):
 
     global ULTIMO_INFORME_ARA
 
@@ -191,17 +193,28 @@ def ara_star(inicio, objetivo, heuristica, eps_inicial=None, eps_final=None, eps
     epsilons = _epsilons_ara()
 
     # decide si ARA* se ejecuta en modo offline o anytime
-    modo = getattr(config, "MODO_ARA", "offline")
+    if modo is None:
+        modo_efectivo = getattr(config, "MODO_ARA", "offline")
+    elif modo == "anytime":
+        modo_efectivo = "anytime_simple"
+    else:
+        modo_efectivo = modo
 
-    if modo == "anytime_simple":
+    if modo_efectivo == "anytime_simple":
         from planificacion.ara_anytime import planificar_ara_anytime_simple
 
         camino, historial, nodos_totales = planificar_ara_anytime_simple(
-            inicio, objetivo, heuristica, epsilons=epsilons
+            inicio,
+            objetivo,
+            heuristica,
+            epsilons=epsilons,
+            cambiar_suelo=cambiar_suelo
         )
+
 
         ULTIMO_INFORME_ARA = {
             "modo": "anytime_simple",
+            "cambiar_suelo": cambiar_suelo,
             "inicio": inicio,
             "objetivo": objetivo,
             "historial": historial,
@@ -216,8 +229,10 @@ def ara_star(inicio, objetivo, heuristica, eps_inicial=None, eps_final=None, eps
 
         ULTIMO_INFORME_ARA = {
             "modo": "offline",
+            "cambiar_suelo": False,
             "inicio": inicio,
             "objetivo": objetivo,
+            "historial": historial,
             "iteraciones": historial,
             "ruta_final": list(camino),
         }

@@ -7,14 +7,18 @@ import pathlib
 # base hacemos que los ficheros de datos (generated_map.json, etc.) se
 # encuentren independientemente del CWD desde el que se lance Python.
 _AQUI = pathlib.Path(__file__).parent
+_EXPERIMENTO_JSON = _AQUI / "experimento.json"
+
+with open(_EXPERIMENTO_JSON, encoding="utf-8") as _f:
+    _experimento = json.load(_f)
 
 # ============================================================================
 # VALORES EDITABLES
 # ============================================================================
 
-COSTE_ZONA_1 = 1
-COSTE_ZONA_2 = 5
-COSTE_ZONA_3 = 10
+COSTE_ZONA_1 = _experimento["COSTE_ZONA_1"]
+COSTE_ZONA_2 = _experimento["COSTE_ZONA_2"]
+COSTE_ZONA_3 = _experimento["COSTE_ZONA_3"]
 
 PASOS_POR_FASE_ARA = 5
 PESO_ASTAR_PONDERADO = 1.5
