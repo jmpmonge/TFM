@@ -63,4 +63,4 @@ def es_libre(fila, col):
     if col < 0 or col >= config.COLUMNAS_MAPA:
         return False
 
-    return config.GRID[fila][col] != 1
+    return not config.celda_bloqueada(fila, col)

@@ -81,6 +81,7 @@ dibujar_bateria(
     config.BATERIA_MAX,
     valor_grid=_valor_grid_inicio,
     consumo_celda=coste_base_celda(_celda_inicio),
+    celda=_celda_inicio,
 )
 
 ULTIMO_INDICE_BATERIA = INDICE_OBJETIVO
@@ -120,5 +121,6 @@ while paso():
         config.BATERIA_MAX,
         valor_grid=valor_grid,
         consumo_celda=consumo_celda,
+        celda=celda_actual,
     )
     fijar_velocidad_ruedas(left_speed, right_speed)

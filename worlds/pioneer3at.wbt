@@ -26,6 +26,7 @@ TexturedBackgroundLight {
 }
 RectangleArena {
   floorSize 24 24
+  floorTileSize 0.5 0.5
   floorAppearance SandyGround {
   }
   wallThickness 0.05
@@ -84,7 +85,7 @@ DEF PIONEER_3AT Pioneer3at {
   ]
 }
 DEF GOAL_MARKER Solid {
-  translation -3.75 7.15 0.02
+  translation -0.75 7.15 0.02
   children [
     Shape {
       appearance PBRAppearance {
@@ -103,7 +104,7 @@ DEF GOAL_MARKER Solid {
   name "GOAL_MARKER_G_-4.25_7.25"
 }
 DEF GOAL_ARA Solid {
-  translation -3.75 7.15 0.55
+  translation -0.75 7.15 0.55
   children [
     Shape {
       appearance PBRAppearance {
@@ -139,7 +140,7 @@ DEF COST_ZONE_1 Solid {
   name "COST_ZONE_1"
 }
 DEF COST_ZONE_2 Solid {
-  translation -8.25 -1 0.008
+  translation -8.5 -1 0.008
   children [
     Shape {
       appearance PBRAppearance {
@@ -149,14 +150,14 @@ DEF COST_ZONE_2 Solid {
         metalness 0
       }
       geometry Box {
-        size 7.5 3 0.01
+        size 7 3 0.01
       }
     }
   ]
   name "COST_ZONE_2"
 }
 DEF COST_ZONE_3 Solid {
-  translation 0 -4.75 0.008
+  translation 0 -4.5 0.008
   children [
     Shape {
       appearance PBRAppearance {
@@ -166,7 +167,7 @@ DEF COST_ZONE_3 Solid {
         metalness 0
       }
       geometry Box {
-        size 3 3.5 0.01
+        size 3 2 0.01
       }
     }
   ]
@@ -372,7 +373,7 @@ DEF WALL_013 Solid {
   }
 }
 DEF WALL_016 Solid {
-  translation -4.75 -8.75 0.25
+  translation -2.50 -8.75 0.25
   children [
     Shape {
       appearance USE WALL_APP

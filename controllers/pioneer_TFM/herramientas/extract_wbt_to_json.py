@@ -34,7 +34,7 @@ DEFAULT_COST_ZONE = 2.0
 
 # Tamaño de celda lógica (1 m). El número de celdas se infiere del comentario
 # "Mapa lógico NxN" del .wbt; si no aparece, se usa floorSize de la arena.
-LOGICAL_CELL_SIZE = 1.0
+LOGICAL_CELL_SIZE = 0.5
 
 
 # ============================================================================

@@ -67,7 +67,7 @@ def colocar_meta(x, y, z=1.0, goal_def="GOAL_1"):
         nodo.getField("translation").setSFVec3f([float(x), float(y), float(z)])
 
 
-def dibujar_bateria(bateria_actual, bateria_max, valor_grid=0, consumo_celda=None):
+def dibujar_bateria(bateria_actual, bateria_max, valor_grid=0, consumo_celda=None, celda=None):
     """Display de batería; opcionalmente avisa si el robot está en zona de coste."""
     if display is None:
         return
@@ -87,7 +87,7 @@ def dibujar_bateria(bateria_actual, bateria_max, valor_grid=0, consumo_celda=Non
         proporcion = max(0.0, min(1.0, bateria_actual / bateria_max))
 
     ancho_relleno = int(ancho_barra * proporcion)
-    en_zona = valor_grid > 0
+    en_zona = celda in config.CELDAS_COSTE if celda is not None else valor_grid > 0
     zona_cara = valor_grid >= 10
     zona_muy_cara = valor_grid >= 30
 

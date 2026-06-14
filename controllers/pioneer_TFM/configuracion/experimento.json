@@ -1,8 +1,8 @@
 {
-  "COSTE_ZONA_1": 3.0,
-  "COSTE_ZONA_2": 15.0,
-  "COSTE_ZONA_3": 5,
-  "PASOS_POR_FASE_ARA": 10,
+  "COSTE_ZONA_1": 1,
+  "COSTE_ZONA_2": 5,
+  "COSTE_ZONA_3": 20,
+  "PASOS_POR_FASE_ARA": 5,
   "PESO_ASTAR_PONDERADO": 1.5,
   "EPSILON_INICIAL_ARA": 5,
   "EPSILON_FINAL_ARA": 1.0,
@@ -14,7 +14,7 @@
   ],
   "OBJETIVOS_MUNDO_POR_DEFECTO": [
     [
-      -3.75,
+      -0.75,
       7.15
     ]
   ],

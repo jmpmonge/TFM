@@ -2,7 +2,6 @@ import json
 import math
 import os
 import pathlib
-import re
 
 # Ruta del directorio donde vive este propio config.py. Usándola siempre como
 # base hacemos que los ficheros de datos (generated_map.json, etc.) se
@@ -13,9 +12,9 @@ _AQUI = pathlib.Path(__file__).parent
 # VALORES EDITABLES
 # ============================================================================
 
-COSTE_ZONA_1 = 5
+COSTE_ZONA_1 = 1
 COSTE_ZONA_2 = 5
-COSTE_ZONA_3 = 5
+COSTE_ZONA_3 = 10
 
 PASOS_POR_FASE_ARA = 5
 PESO_ASTAR_PONDERADO = 1.5
@@ -28,10 +27,10 @@ BATERIA_MAX = 800
 
 INICIO_MUNDO_POR_DEFECTO = (-4.25, 10.25)
 OBJETIVOS_MUNDO_POR_DEFECTO = [
-    (-4.25, 7.25),
+    (-6.25, 9.25),
 ]
 
-SUELO_CAMBIANTE = False
+SUELO_CAMBIANTE = True
 
 
 # ============================================================================
@@ -61,7 +60,7 @@ MODO_ARA = "anytime_simple"
 
 # Consumo por celda: libre (0) → 1; zona de coste → valor del grid.
 # Si True, pasos diagonales consumen coste_celda × sqrt(2) (como la planificación).
-USAR_FACTOR_DIAGONAL_BATERIA = False
+USAR_FACTOR_DIAGONAL_BATERIA = True
 # Logs de batería en consola (el display visual usa dibujar_bateria()).
 LOG_BATERIA_CELDAS = False      # una línea por celda recorrida (depuración)
 LOG_BATERIA_OBJETIVOS = True    # objetivos descartados por falta de batería
@@ -87,7 +86,7 @@ mapa = cargar_mapa_desde_wbt(
     verbose=False,
 )
 
-CELL_SIZE = mapa.get("cell_size", 1.0)
+CELL_SIZE = mapa.get("cell_size", 0.5)
 CENTRO_CELDA = CELL_SIZE / 2
 
 MARGEN_SEGURIDAD = 0.3
@@ -127,10 +126,9 @@ else:
 
 # ============================================================================
 # FUNCIONES AUXILIARES
-# Definidas aquí (y no en planificacion/mapa.py) para evitar import circular:
-# config.py las usa internamente al construir la rejilla y al calcular las
-# celdas de inicio/objetivo. mapa.py replica las mismas funciones para que el
-# resto del proyecto las consuma desde la capa de planificación.
+# Definidas aquí (y no en planificacion/mapa.py) para evitar import circular.
+# mapa.py replica mundo_a_rejilla y centro_celda para la capa de planificación.
+# La construcción de la rejilla está en planificacion/grid.py.
 # ============================================================================
 
 def mundo_a_rejilla(x, y):
@@ -146,24 +144,6 @@ def centro_celda(row, col):
     x = ORIGEN_MAPA_X + col * CELL_SIZE + CENTRO_CELDA
     y = ORIGEN_MAPA_Y + (FILAS_MAPA - 1 - row) * CELL_SIZE + CENTRO_CELDA
     return x, y
-
-
-def celda_ocupada(row, col, obs):
-    """True si el centro de la celda cae dentro del obstáculo (sin margen)."""
-    cx, cy = centro_celda(row, col)
-    h = CELL_SIZE / 2.0
-
-    if obs.get("type") == "box":
-        ox0 = obs["x"] - obs["size_x"] / 2.0
-        ox1 = obs["x"] + obs["size_x"] / 2.0
-        oy0 = obs["y"] - obs["size_y"] / 2.0
-        oy1 = obs["y"] + obs["size_y"] / 2.0
-        return cx - h < ox1 and cx + h > ox0 and cy - h < oy1 and cy + h > oy0
-
-    radio = obs.get("radius", RADIO_OBSTACULO)
-    dx = cx - obs["x"]
-    dy = cy - obs["y"]
-    return math.sqrt(dx * dx + dy * dy) <= radio + h
 
 
 def distancia_a_obstaculo(x, y, obs):
@@ -184,65 +164,33 @@ def distancia_al_contorno(x, y):
     return min(distancia_a_obstaculo(x, y, obs) for obs in OBSTACULOS)
 
 
-def aplicar_margen_contorno(grid_base):
-    """
-    Expande el obstáculo solo hacia el espacio libre (contorno unificado).
-
-    A diferencia de inflar cada caja por separado, la distancia se mide al
-    contorno más cercano de todos los muros; las junturas interiores no suman
-    margen dos veces.
-    """
-    if MARGEN_SEGURIDAD <= 0.0:
-        return grid_base
-
-    grid = [fila[:] for fila in grid_base]
-    for row in range(FILAS_MAPA):
-        for col in range(COLUMNAS_MAPA):
-            if grid_base[row][col]:
-                continue
-            cx, cy = centro_celda(row, col)
-            if distancia_al_contorno(cx, cy) < MARGEN_SEGURIDAD:
-                grid[row][col] = 1
-    return grid
-
-
 # ============================================================================
 # CREAR REJILLA desde obstáculos del .wbt
-# 0 = celda libre, 1 = celda ocupada (muro del laberinto)
 # ============================================================================
-_GRID_BASE = [[0 for _ in range(COLUMNAS_MAPA)] for _ in range(FILAS_MAPA)]
+from planificacion.grid import actualizar_costes_zonas as _actualizar_costes_zonas
+from planificacion.grid import celda_bloqueada as _celda_bloqueada
+from planificacion.grid import construir_grid
 
-for row in range(FILAS_MAPA):
-    for col in range(COLUMNAS_MAPA):
-        for obs in OBSTACULOS:
-            if celda_ocupada(row, col, obs):
-                _GRID_BASE[row][col] = 1
-                break
-
-GRID = aplicar_margen_contorno(_GRID_BASE)
-
-# 3 zonas de coste: geometria en .wbt, coste g en COSTE_ZONA_1/2/3 arriba.
 ZONAS_COSTE = mapa.get("cost_zones", [])
 
-def coste_de_zona(nombre):
-    """Devuelve el coste g configurado para COST_ZONE_1, _2 o _3."""
-    coincidencia = re.match(r"^COST_ZONE_(\d+)$", nombre)
-    if not coincidencia:
-        return 1.0
-    indice = int(coincidencia.group(1))
-    return {1: COSTE_ZONA_1, 2: COSTE_ZONA_2, 3: COSTE_ZONA_3}.get(indice, 1.0)
+_GRID_BASE, GRID, CELDAS_POR_ZONA, CELDAS_COSTE = construir_grid(
+    OBSTACULOS,
+    ZONAS_COSTE,
+    FILAS_MAPA,
+    COLUMNAS_MAPA,
+    MARGEN_SEGURIDAD,
+    COSTE_ZONA_1,
+    COSTE_ZONA_2,
+    COSTE_ZONA_3,
+    centro_celda,
+    CELL_SIZE,
+    RADIO_OBSTACULO,
+)
 
 
-CELDAS_POR_ZONA = {}
-for _zona in ZONAS_COSTE:
-    _nombre = _zona["name"]
-    _coste = coste_de_zona(_nombre)
-    _celdas = []
-    for _row, _col in _zona.get("grid", {}).get("cells", []):
-        if GRID[_row][_col] == 0:
-            GRID[_row][_col] = _coste
-            _celdas.append((_row, _col))
-    CELDAS_POR_ZONA[_nombre] = _celdas
+def celda_bloqueada(row, col):
+    """True si muro físico o margen; False si libre o zona de coste (aunque GRID==1)."""
+    return _celda_bloqueada(row, col, _GRID_BASE, GRID, CELDAS_COSTE)
 
 
 def aplicar_costes_zonas(zona1=None, zona2=None, zona3=None):
@@ -254,10 +202,7 @@ def aplicar_costes_zonas(zona1=None, zona2=None, zona3=None):
         COSTE_ZONA_2 = float(zona2)
     if zona3 is not None:
         COSTE_ZONA_3 = float(zona3)
-    for _nombre, _celdas in CELDAS_POR_ZONA.items():
-        _coste = coste_de_zona(_nombre)
-        for _row, _col in _celdas:
-            GRID[_row][_col] = _coste
+    _actualizar_costes_zonas(GRID, CELDAS_POR_ZONA, COSTE_ZONA_1, COSTE_ZONA_2, COSTE_ZONA_3)
 
 # ============================================================================
 # COMPROBAR START Y GOAL
@@ -266,7 +211,7 @@ CELDA_INICIO = mundo_a_rejilla(INICIO_MUNDO[0], INICIO_MUNDO[1])
 CELDA_OBJETIVO = mundo_a_rejilla(OBJETIVO_MUNDO[0], OBJETIVO_MUNDO[1])
 CELDAS_OBJETIVO = [mundo_a_rejilla(x, y) for x, y in OBJETIVOS_MUNDO]
 
-if GRID[CELDA_INICIO[0]][CELDA_INICIO[1]] == 1:
+if celda_bloqueada(*CELDA_INICIO):
     cx, cy = centro_celda(*CELDA_INICIO)
     d = distancia_al_contorno(cx, cy)
     raise ValueError(
@@ -274,7 +219,7 @@ if GRID[CELDA_INICIO[0]][CELDA_INICIO[1]] == 1:
         f"(distancia al muro más cercano: {d:.2f} m)"
     )
 
-if GRID[CELDA_OBJETIVO[0]][CELDA_OBJETIVO[1]] == 1:
+if celda_bloqueada(*CELDA_OBJETIVO):
     cx, cy = centro_celda(*CELDA_OBJETIVO)
     d = distancia_al_contorno(cx, cy)
     raise ValueError(
@@ -283,7 +228,7 @@ if GRID[CELDA_OBJETIVO[0]][CELDA_OBJETIVO[1]] == 1:
     )
 
 for objetivo_mundo, celda_objetivo in zip(OBJETIVOS_MUNDO, CELDAS_OBJETIVO):
-    if GRID[celda_objetivo[0]][celda_objetivo[1]] == 1:
+    if celda_bloqueada(*celda_objetivo):
         cx, cy = centro_celda(*celda_objetivo)
         d = distancia_al_contorno(cx, cy)
         raise ValueError(

@@ -74,7 +74,7 @@ def actualizar_suelo_cambiante_si_toca(indice_fase):
     if _SUELO_CAMBIANTE_APLICADO:
         return False
 
-    nuevo_zona_1 = config.COSTE_ZONA_1 * 5
+    nuevo_zona_1 = config.COSTE_ZONA_1 * 30
     nuevo_zona_2 = config.COSTE_ZONA_2 / 5
     nuevo_zona_3 = config.COSTE_ZONA_3
 
@@ -88,9 +88,9 @@ def actualizar_suelo_cambiante_si_toca(indice_fase):
     print("=" * 45)
     print("SUELO CAMBIANTE ACTIVADO")
     print("=" * 45)
-    print("COSTE_ZONA_1 x5 =", config.COSTE_ZONA_1)
-    print("COSTE_ZONA_2 /5 =", config.COSTE_ZONA_2)
-    print("COSTE_ZONA_3    =", config.COSTE_ZONA_3)
+    print("COSTE_ZONA_1 x30 =", config.COSTE_ZONA_1)
+    print("COSTE_ZONA_2 /5  =", config.COSTE_ZONA_2)
+    print("COSTE_ZONA_3     =", config.COSTE_ZONA_3)
     print("=" * 45)
     print()
 

@@ -54,7 +54,7 @@ def pedir_entero(nombre, valor_por_defecto):
 
 def _posicion_transitable(config, x, y):
     fila, col = config.mundo_a_rejilla(x, y)
-    return config.GRID[fila][col] != 1
+    return not config.celda_bloqueada(fila, col)
 
 
 def pedir_configuracion(config_mod=None):

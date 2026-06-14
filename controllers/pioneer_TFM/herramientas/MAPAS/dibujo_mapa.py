@@ -6,6 +6,7 @@ import numpy as np
 from configuracion.config import (
     CELDA_INICIO,
     CELDAS_OBJETIVO,
+    CELDAS_POR_ZONA,
     COLUMNAS_MAPA,
     FILAS_MAPA,
     GRID,
@@ -97,16 +98,11 @@ def dibujar_zona_seguridad(ax):
 # --- 4. ZONAS DE COSTE ---
 
 def dibujar_zonas_coste(ax):
-    for zona in ZONAS_COSTE:
-        nombre = zona.get("name")
+    for nombre, celdas in CELDAS_POR_ZONA.items():
         color = COLORES_ZONA.get(nombre, (0.12, 0.45, 0.95))
 
-        grid_info = zona.get("grid", {})
-        celdas = grid_info.get("cells", [])
-
         for fila, col in celdas:
-            if GRID[fila][col] > 1:
-                ax.add_patch(
+            ax.add_patch(
                     Rectangle(
                         (col - 0.5, fila - 0.5),
                         1,
@@ -125,7 +121,8 @@ def dibujar_zonas_coste(ax):
 def _celda_libre(fila, col):
     if fila < 0 or fila >= FILAS_MAPA or col < 0 or col >= COLUMNAS_MAPA:
         return True
-    return GRID[fila][col] != 1
+    from configuracion import config
+    return not config.celda_bloqueada(fila, col)
 
 
 def dibujar_linea_limite(ax):
@@ -133,7 +130,7 @@ def dibujar_linea_limite(ax):
 
     for fila in range(FILAS_MAPA):
         for col in range(COLUMNAS_MAPA):
-            if GRID[fila][col] != 1:
+            if _celda_libre(fila, col):
                 continue
 
             x0 = col - 0.5
@@ -278,8 +275,8 @@ def guardar_mapa(
     fig, (ax, ax_panel) = plt.subplots(
         1,
         2,
-        figsize=(12, 10),
-        gridspec_kw={"width_ratios": [3, 1.2]},
+        figsize=(13, 10),
+        gridspec_kw={"width_ratios": [3, 1.55]},
     )
 
     ax.set_xlim(-0.5, COLUMNAS_MAPA - 0.5)
@@ -303,7 +300,7 @@ def guardar_mapa(
         ax_panel, titulo, len_camino, coste_g, nodos, dibujar_ida, dibujar_vuelta, informe_anytime,
     )
 
-    plt.savefig(nombre_archivo, dpi=150)
+    plt.savefig(nombre_archivo, dpi=150, bbox_inches="tight", pad_inches=0.12)
     plt.close(fig)
 
     print(f"Mapa guardado en {nombre_archivo}")
