@@ -1,3 +1,2 @@
 publish: true
-type: benchmark
-dockerCompose:theia:webots-project/controllers/controller-name/
+type: demo
