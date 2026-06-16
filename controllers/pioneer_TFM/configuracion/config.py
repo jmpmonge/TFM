@@ -1,281 +1,59 @@
 import json
-import math
-import os
 import pathlib
 
-# Ruta del directorio donde vive este propio config.py. Usándola siempre como
-# base hacemos que los ficheros de datos (generated_map.json, etc.) se
-# encuentren independientemente del CWD desde el que se lance Python.
 _AQUI = pathlib.Path(__file__).parent
-_EXPERIMENTO_JSON = _AQUI / "experimento.json"
 
-with open(_EXPERIMENTO_JSON, encoding="utf-8") as _f:
+with open(_AQUI / "experimento.json", encoding="utf-8") as _f:
     _experimento = json.load(_f)
 
 # ============================================================================
-# VALORES EDITABLES
+# EXPERIMENTO (experimento.json — única fuente de verdad)
 # ============================================================================
 
 COSTE_ZONA_1 = _experimento["COSTE_ZONA_1"]
 COSTE_ZONA_2 = _experimento["COSTE_ZONA_2"]
 COSTE_ZONA_3 = _experimento["COSTE_ZONA_3"]
 
-PASOS_POR_FASE_ARA = 5
-PESO_ASTAR_PONDERADO = 1.5
+PASOS_POR_FASE_ARA = _experimento["PASOS_POR_FASE_ARA"]
+PESO_ASTAR_PONDERADO = _experimento["PESO_ASTAR_PONDERADO"]
 
-EPSILON_INICIAL_ARA = 5
-EPSILON_FINAL_ARA = 1.0
-EPSILON_PASO_ARA = 1
+EPSILON_INICIAL_ARA = _experimento["EPSILON_INICIAL_ARA"]
+EPSILON_FINAL_ARA = _experimento["EPSILON_FINAL_ARA"]
+EPSILON_PASO_ARA = _experimento["EPSILON_PASO_ARA"]
 
-BATERIA_MAX = 800
+BATERIA_MAX = _experimento["BATERIA_MAX"]
 
-INICIO_MUNDO_POR_DEFECTO = (-4.25, 10.25)
+INICIO_MUNDO_POR_DEFECTO = tuple(_experimento["INICIO_MUNDO_POR_DEFECTO"])
 OBJETIVOS_MUNDO_POR_DEFECTO = [
-    (-6.25, 9.25),
+    tuple(p) for p in _experimento["OBJETIVOS_MUNDO_POR_DEFECTO"]
 ]
 
-SUELO_CAMBIANTE = True
-
+SUELO_CAMBIANTE = _experimento["SUELO_CAMBIANTE"]
 
 # ============================================================================
-# PARAMETROS GENERALES
+# CONTROLADOR (solo config.py — no van en experimento.json)
 # ============================================================================
 
-TIEMPO_PASO = 32 # 32ms (velocidad de lectura de cada paso)  
-VELOCIDAD_AVANCE = 6.4 # Velocidad de avance en m/s, máxima 6.4 m/s
-VELOCIDAD_GIRO = 6.0 # Velocidad de giro en rad/s, máxima 6.4 rad/s    
-RUEDAS = 0.0975 # Radio de las ruedas en m
-DISTANCIA_EJES = 0.325 # Distancia entre las ruedas en m
+TIEMPO_PASO = 32
+VELOCIDAD_AVANCE = 6.4
+VELOCIDAD_GIRO = 6.0
+RUEDAS = 0.0975
+DISTANCIA_EJES = 0.325
 
-# Algoritmo de planificacion activo.
-ALGORITMO = "ara_star" # "ara_star" | "astar" | "greedy" | "dijkstra"
-
-# Heurística que usa A* para estimar lo que falta hasta el goal.
-# Opciones: "manhattan" | "euclidiana" | "octil" | "cero" (Dijkstra) | "agresiva" (greedy)
-HEURISTICA = "octil" # "manhattan" | "euclidiana" | "octil"
-
-# Modo ARA*: "offline" (planifica todo y luego mueve) | "anytime_simple" (simulacion por fases)
+ALGORITMO = "ara_star"
+HEURISTICA = "octil"
 MODO_ARA = "anytime_simple"
-
-# ============================================================================
-# MAPA — laberinto (worlds/pioneer3at.wbt)
-# En cada arranque se lee el .wbt, se actualiza generated_map.json y se construye GRID.
-# ============================================================================
-
-# Consumo por celda: libre (0) → 1; zona de coste → valor del grid.
-# Si True, pasos diagonales consumen coste_celda × sqrt(2) (como la planificación).
-USAR_FACTOR_DIAGONAL_BATERIA = True
-# Logs de batería en consola (el display visual usa dibujar_bateria()).
-LOG_BATERIA_CELDAS = False      # una línea por celda recorrida (depuración)
-LOG_BATERIA_OBJETIVOS = True    # objetivos descartados por falta de batería
-
-# ============================================================================
-# CARGAR MAPA DESDE WBT (siempre al importar config / arrancar controlador)
-# ============================================================================
-import sys
-
-_CONTROLLER_DIR = _AQUI.parent
-if str(_CONTROLLER_DIR) not in sys.path:
-    sys.path.insert(0, str(_CONTROLLER_DIR))
-
-_ROOT_DIR = _CONTROLLER_DIR.parent.parent
-_WBT_MAPA = _ROOT_DIR / "worlds" / "pioneer3at.wbt"
-_JSON_MAPA = _AQUI / "generated_map.json"
-
-from herramientas.extract_wbt_to_json import cargar_mapa_desde_wbt
-
-mapa = cargar_mapa_desde_wbt(
-    wbt_path=str(_WBT_MAPA),
-    json_path=str(_JSON_MAPA),
-    verbose=False,
-)
-
-CELL_SIZE = mapa.get("cell_size", 0.5)
-CENTRO_CELDA = CELL_SIZE / 2
 
 MARGEN_SEGURIDAD = 0.3
 
-X_LIMITS = mapa["x_limits"]
-Y_LIMITS = mapa["y_limits"]
-RADIO_OBSTACULO = mapa["obstacle_radius"]
-OBSTACULOS = mapa["obstacles"]
-GOALS = mapa.get("goals", [])
-START = mapa.get("start")
-
-if START:
-    INICIO_MUNDO = (START["x"], START["y"])
-else:
-    INICIO_MUNDO = INICIO_MUNDO_POR_DEFECTO
-
-if GOALS:
-    OBJETIVOS_MUNDO = [(goal["x"], goal["y"]) for goal in GOALS]
-else:
-    OBJETIVOS_MUNDO = OBJETIVOS_MUNDO_POR_DEFECTO
-
-OBJETIVO_MUNDO = OBJETIVOS_MUNDO[0] # Compatibilidad con código que aún usa un único objetivo
-
-ORIGEN_MAPA_X = X_LIMITS[0] # Coordenada X del origen del mapa
-ORIGEN_MAPA_Y = Y_LIMITS[0] # Coordenada Y del origen del mapa
-
-ANCHO_MAPA = X_LIMITS[1] - X_LIMITS[0]
-ALTO_MAPA = Y_LIMITS[1] - Y_LIMITS[0]
-
-if "grid_cols" in mapa and "grid_rows" in mapa:
-    COLUMNAS_MAPA = mapa["grid_cols"]
-    FILAS_MAPA = mapa["grid_rows"]
-else:
-    COLUMNAS_MAPA = int(ANCHO_MAPA / CELL_SIZE)
-    FILAS_MAPA = int(ALTO_MAPA / CELL_SIZE)
-
+USAR_FACTOR_DIAGONAL_BATERIA = True
+LOG_BATERIA_CELDAS = False
+LOG_BATERIA_OBJETIVOS = True
 
 # ============================================================================
-# FUNCIONES AUXILIARES
-# Definidas aquí (y no en planificacion/mapa.py) para evitar import circular.
-# mapa.py replica mundo_a_rejilla y centro_celda para la capa de planificación.
-# La construcción de la rejilla está en planificacion/grid.py.
+# Carga mapa, rejilla y funciones auxiliares (entorno.py)
 # ============================================================================
 
-def mundo_a_rejilla(x, y):
-    """Misma convención que planificacion/mapa.py (fila 0 = parte superior)."""
-    col = int((x - ORIGEN_MAPA_X) / CELL_SIZE)
-    row = int(((ORIGEN_MAPA_Y + FILAS_MAPA * CELL_SIZE) - y) / CELL_SIZE)
-    col = max(0, min(COLUMNAS_MAPA - 1, col))
-    row = max(0, min(FILAS_MAPA - 1, row))
-    return row, col
+from configuracion.entorno import cargar_entorno
 
-
-def centro_celda(row, col):
-    x = ORIGEN_MAPA_X + col * CELL_SIZE + CENTRO_CELDA
-    y = ORIGEN_MAPA_Y + (FILAS_MAPA - 1 - row) * CELL_SIZE + CENTRO_CELDA
-    return x, y
-
-
-def distancia_a_obstaculo(x, y, obs):
-    """Distancia euclídea del punto (x, y) al contorno del obstáculo."""
-    if obs.get("type") == "box":
-        dx = max(0.0, abs(x - obs["x"]) - obs["size_x"] / 2.0)
-        dy = max(0.0, abs(y - obs["y"]) - obs["size_y"] / 2.0)
-        return math.hypot(dx, dy)
-
-    radio = obs.get("radius", RADIO_OBSTACULO)
-    return max(0.0, math.hypot(x - obs["x"], y - obs["y"]) - radio)
-
-
-def distancia_al_contorno(x, y):
-    """Distancia mínima al contorno de cualquier obstáculo del mapa."""
-    if not OBSTACULOS:
-        return float("inf")
-    return min(distancia_a_obstaculo(x, y, obs) for obs in OBSTACULOS)
-
-
-# ============================================================================
-# CREAR REJILLA desde obstáculos del .wbt
-# ============================================================================
-from planificacion.grid import actualizar_costes_zonas as _actualizar_costes_zonas
-from planificacion.grid import celda_bloqueada as _celda_bloqueada
-from planificacion.grid import construir_grid
-
-ZONAS_COSTE = mapa.get("cost_zones", [])
-
-_GRID_BASE, GRID, CELDAS_POR_ZONA, CELDAS_COSTE = construir_grid(
-    OBSTACULOS,
-    ZONAS_COSTE,
-    FILAS_MAPA,
-    COLUMNAS_MAPA,
-    MARGEN_SEGURIDAD,
-    COSTE_ZONA_1,
-    COSTE_ZONA_2,
-    COSTE_ZONA_3,
-    centro_celda,
-    CELL_SIZE,
-    RADIO_OBSTACULO,
-)
-
-
-def celda_bloqueada(row, col):
-    """True si muro físico o margen; False si libre o zona de coste (aunque GRID==1)."""
-    return _celda_bloqueada(row, col, _GRID_BASE, GRID, CELDAS_COSTE)
-
-
-def aplicar_costes_zonas(zona1=None, zona2=None, zona3=None):
-    """Actualiza COSTE_ZONA_1/2/3 y reescribe el GRID de cada zona."""
-    global COSTE_ZONA_1, COSTE_ZONA_2, COSTE_ZONA_3
-    if zona1 is not None:
-        COSTE_ZONA_1 = float(zona1)
-    if zona2 is not None:
-        COSTE_ZONA_2 = float(zona2)
-    if zona3 is not None:
-        COSTE_ZONA_3 = float(zona3)
-    _actualizar_costes_zonas(GRID, CELDAS_POR_ZONA, COSTE_ZONA_1, COSTE_ZONA_2, COSTE_ZONA_3)
-
-# ============================================================================
-# COMPROBAR START Y GOAL
-# ============================================================================
-CELDA_INICIO = mundo_a_rejilla(INICIO_MUNDO[0], INICIO_MUNDO[1])
-CELDA_OBJETIVO = mundo_a_rejilla(OBJETIVO_MUNDO[0], OBJETIVO_MUNDO[1])
-CELDAS_OBJETIVO = [mundo_a_rejilla(x, y) for x, y in OBJETIVOS_MUNDO]
-
-if celda_bloqueada(*CELDA_INICIO):
-    cx, cy = centro_celda(*CELDA_INICIO)
-    d = distancia_al_contorno(cx, cy)
-    raise ValueError(
-        f"INICIO_MUNDO no válido con margen {MARGEN_SEGURIDAD} m: {INICIO_MUNDO} -> {CELDA_INICIO} "
-        f"(distancia al muro más cercano: {d:.2f} m)"
-    )
-
-if celda_bloqueada(*CELDA_OBJETIVO):
-    cx, cy = centro_celda(*CELDA_OBJETIVO)
-    d = distancia_al_contorno(cx, cy)
-    raise ValueError(
-        f"OBJETIVO_MUNDO no válido con margen {MARGEN_SEGURIDAD} m: {OBJETIVO_MUNDO} -> {CELDA_OBJETIVO} "
-        f"(distancia al muro más cercano: {d:.2f} m)"
-    )
-
-for objetivo_mundo, celda_objetivo in zip(OBJETIVOS_MUNDO, CELDAS_OBJETIVO):
-    if celda_bloqueada(*celda_objetivo):
-        cx, cy = centro_celda(*celda_objetivo)
-        d = distancia_al_contorno(cx, cy)
-        raise ValueError(
-            f"Objetivo no válido con margen {MARGEN_SEGURIDAD} m: {objetivo_mundo} -> {celda_objetivo} "
-            f"(distancia al muro más cercano: {d:.2f} m)"
-        )
-
-
-# ============================================================================
-# RESUMEN DE CONFIGURACION (consola / mapa)
-# ============================================================================
-
-_ETIQUETAS_ALGORITMO = {
-    "dijkstra": "Dijkstra",
-    "astar": "A*",
-    "greedy": "Greedy",
-    "ara_star": "ARA*",
-}
-
-_ETIQUETAS_HEURISTICA = {
-    "nula": "Nula",
-    "manhattan": "Manhattan",
-    "euclidiana": "Euclídea",
-    "octil": "Octil",
-}
-
-
-def imprimir_configuracion_planificacion():
-    """Confirma en consola los parametros activos de planificacion."""
-    print()
-    print("=" * 45)
-    print("CONFIGURACION DE PLANIFICACION")
-    print("=" * 45)
-    print("Algoritmo:", _ETIQUETAS_ALGORITMO.get(ALGORITMO, ALGORITMO))
-    if ALGORITMO != "dijkstra":
-        print("Heuristica:", _ETIQUETAS_HEURISTICA.get(HEURISTICA, HEURISTICA))
-    print("Coste zona 1 (azul)  :", COSTE_ZONA_1)
-    print("Coste zona 2 (verde):", COSTE_ZONA_2)
-    print("Coste zona 3 (amar.) :", COSTE_ZONA_3)
-    print("Suelo cambiante      :", SUELO_CAMBIANTE)
-    if ALGORITMO == "ara_star":
-        print("Modo ARA:", MODO_ARA)
-        if MODO_ARA == "anytime_simple":
-            print("Pasos por fase:", PASOS_POR_FASE_ARA)
-    print("=" * 45)
-    print()
+cargar_entorno()
