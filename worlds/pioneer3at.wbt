@@ -9,10 +9,10 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 
 WorldInfo {
   info [
-    "Pioneer 3-AT snake maze on 24x24 m square arena."
-    "48x48 logical grid at 0.5 m/cell."
+    "Laberinto con Pioneer 3-AT en arena cuadrada de 24x24 m."
+    "Rejilla lógica 48x48 con celdas de 0,5 m."
   ]
-  title "Pioneer 3-AT - Laberinto serpiente"
+  title "Pioneer 3-AT - Laberinto"
   lineScale 0.5
 }
 Viewpoint {
