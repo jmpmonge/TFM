@@ -96,7 +96,7 @@ def dibujar_panel(ax, titulo, len_camino, coste_g, nodos, dibujar_ida=True, dibu
             f"{config.COSTE_ZONA_1:g} / {config.COSTE_ZONA_2:g} / {config.COSTE_ZONA_3:g}",
         ),
     )
-    y = _escribir_linea(ax, y, _linea("ponderacion dinámica", "x30 / /5 / x1"))
+    y = _escribir_linea(ax, y, _linea("ponderacion dinámica", "x30 / ÷5 / sin cambio"))
     y = _escribir_linea(ax, y, _linea("dinámico", str(config.SUELO_CAMBIANTE).lower()))
     y = _escribir_linea(ax, y, _linea("tiempo cambio din.", f"{PASOS_POR_FASE_ARA} pasos"))
     y = _escribir_linea(ax, y, _linea("longitud", f"{len_camino} celdas"))

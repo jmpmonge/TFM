@@ -2,3 +2,7 @@
 .cursor/
 __pycache__/
 *.pyc
+.venv/
+**/.mpl-cache/
+worlds/.pioneer*.wbproj
+worlds/.pioneer3at.jpg

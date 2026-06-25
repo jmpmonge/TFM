@@ -1,16 +1,13 @@
-algoritmo,heuristica,coste_total_pasos,nodos_expandidos,factor_expansion_nodos_por_paso,diferencia_coste_frente_astar_manhattan
-A*,Nula,218.142135623731,2797,12.821915362672021,igual
-A*,Manhattan,218.142135623731,1460,6.6928839576335895,igual
-A*,Euclidiana,218.142135623731,1970,9.030809175711076,igual
-A*,Octil,218.142135623731,1862,8.535719129529962,igual
-WA* (ε=1.5,Manhattan,218.97056274847722,1634,7.462190257404192,+0.8284271247462129 pasos
-WA* (ε=1.5,Euclidiana,218.142135623731,1507,6.90833981106426,igual
-WA* (ε=1.5,Octil,218.97056274847722,1465,6.6903970178073076,+0.8284271247462129 pasos
-Greedy,Nula,218.142135623731,2797,12.821915362672021,igual
-Greedy,Manhattan,406.22539674441646,1930,4.7510569636154285,+188.08326112068545 pasos
-Greedy,Euclidiana,484.3675323681476,1654,3.41476232296855,+266.22539674441657 pasos
-Greedy,Octil,411.296464556282,1947,4.73381166089156,+193.15432893255098 pasos
-ARA*,Manhattan,250.56854249492403,8410,33.563670508122016,+32.426406871193024 pasos
-ARA*,Euclidiana,218.35777772109145,9214,42.19680240457956,+0.21564209736044404 pasos
-ARA*,Octil,212.38092347159917,9194,43.29014042181371,-5.761212152131833 pasos
-Dijkstra,Nula,212.28719764157884,3162,14.894916109536917,-5.854937982152165 pasos
+grupo_experimento,algoritmo,heuristica,tramo,coste_ponderado,movimientos,celdas,nodos_expandidos,epsilon_inicial,epsilon_final,suelo_cambiante,coste_zona_1_inicial,coste_zona_2_inicial,coste_zona_3_inicial,coste_zona_1_final,coste_zona_2_final,coste_zona_3_final
+estatico,Dijkstra,Nula,inicio->objetivo,109.07106781186548,107,108,1684,,,False,1.0,10.0,20.0,1.0,10.0,20.0
+estatico,A*,Nula,inicio->objetivo,109.07106781186548,107,108,1684,,,False,1.0,10.0,20.0,1.0,10.0,20.0
+estatico,A*,Manhattan,inicio->objetivo,109.07106781186548,107,108,1114,,,False,1.0,10.0,20.0,1.0,10.0,20.0
+estatico,A*,Euclidiana,inicio->objetivo,109.07106781186548,107,108,1288,,,False,1.0,10.0,20.0,1.0,10.0,20.0
+estatico,A*,Octil,inicio->objetivo,109.07106781186548,107,108,1252,,,False,1.0,10.0,20.0,1.0,10.0,20.0
+estatico,Greedy,Nula,inicio->objetivo,109.07106781186548,107,108,1684,,,False,1.0,10.0,20.0,1.0,10.0,20.0
+estatico,Greedy,Manhattan,inicio->objetivo,168.2842712474619,106,107,1655,,,False,1.0,10.0,20.0,1.0,10.0,20.0
+estatico,Greedy,Euclidiana,inicio->objetivo,237.94112549695438,114,115,1469,,,False,1.0,10.0,20.0,1.0,10.0,20.0
+estatico,Greedy,Octil,inicio->objetivo,168.2842712474619,106,107,1724,,,False,1.0,10.0,20.0,1.0,10.0,20.0
+ara,ARA*,Manhattan,inicio->objetivo,130.2842712474619,116,117,5912,5,1.0,True,1.0,10.0,20.0,30.0,2.0,20.0
+ara,ARA*,Euclidiana,inicio->objetivo,130.2842712474619,116,117,5934,5,1.0,True,1.0,10.0,20.0,30.0,2.0,20.0
+ara,ARA*,Octil,inicio->objetivo,130.28427124746187,116,117,5987,5,1.0,True,1.0,10.0,20.0,30.0,2.0,20.0

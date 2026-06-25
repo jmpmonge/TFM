@@ -6,8 +6,8 @@ import sys
 # ============================================================================
 # RUTAS
 # ============================================================================
-# Este archivo está dentro de algo como:
-# controllers/pioneer_TFM/extract_wbt_to_json.py
+# Este archivo está en:
+# controllers/pioneer_TFM/herramientas/extract_wbt_to_json.py
 #
 # Desde aquí buscamos:
 # - el mundo Webots: worlds/pioneer3at.wbt

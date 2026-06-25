@@ -189,7 +189,7 @@ def ara_star(inicio, objetivo, heuristica, cambiar_suelo=True, modo=None):
 
     global ULTIMO_INFORME_ARA
 
-    # lista de epsilons: 2.5 -> 2.0 -> 1.5 -> 1.0
+    # lista de epsilons: 5 -> 4 -> 3 -> 2 -> 1
     epsilons = _epsilons_ara()
 
     # decide si ARA* se ejecuta en modo offline o anytime
