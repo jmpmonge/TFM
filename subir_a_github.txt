@@ -1,3 +1,0 @@
-git add .
-git commit -m "Actualiza el proyecto"
-git push origin main

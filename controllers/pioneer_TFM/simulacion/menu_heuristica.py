@@ -35,7 +35,7 @@ INFO_MODO_ARA = {
     },
     "anytime_simple": {
         "nombre": "anytime_simple",
-        "texto": "Avanza por fases y recalcula desde la posicion alcanzada.",
+        "texto": "Avanza por fases y recalcula desde la posición alcanzada.",
     },
 }
 
@@ -129,7 +129,7 @@ def _imprimir_menu_algoritmos():
         print(f"     {info['texto']}")
         print()
 
-    print("Pulsa un numero del 1 al 4 en la ventana 3D de Webots.")
+    print("Pulsa un número del 1 al 4 en la ventana 3D de Webots.")
     print(_linea_separadora())
 
 
@@ -138,9 +138,9 @@ def _imprimir_menu_heuristica(algoritmo):
 
     print()
     print(_linea_separadora())
-    print(f"ELIGE LA HEURISTICA PARA {titulo}")
+    print(f"ELIGE LA HEURÍSTICA PARA {titulo}")
     print(_linea_separadora())
-    print("La heuristica estima cuanto falta hasta el objetivo.")
+    print("La heurística estima cuánto falta hasta el objetivo.")
     print()
 
     for i, clave in enumerate(OPCIONES_HEURISTICA, start=1):
@@ -149,7 +149,7 @@ def _imprimir_menu_heuristica(algoritmo):
         print(f"     {info['texto']}")
         print()
 
-    print("Pulsa un numero del 1 al 3 en la ventana 3D de Webots.")
+    print("Pulsa un número del 1 al 3 en la ventana 3D de Webots.")
     print(_linea_separadora())
 
 
